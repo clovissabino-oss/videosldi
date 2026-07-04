@@ -126,6 +126,23 @@ Dataset atual: `saida\videos_PRF_2026-07-02.json` (+ .csv), já com todas as col
    `excluidos`, `removerCurso` tira o id de `cursosAtivos`, e
    `atualizarCampoExcluidos` re-renderiza a lista (restaurar também atualiza).
 
+## ✅ Sessão 4 (04/07): painel "Cookie e extração" (colar → 1 clique → árvore)
+
+O popover do cookie virou o **ponto de partida**: cola-se o cookie do F12, escolhe-se
+o concurso (campo novo, salvo no `config.json` via `/api/cookie`) e o botão
+**💾 Salvar e extrair** salva, valida, extrai do zero e abre a árvore — reusando a
+UI de progresso da extração. Metabase segue **oculto** na tela (nota "em breve"); o
+de→para continua pelo `_depara_metabase.bat`. Lógica de persistência do concurso
+isolada em `config_util.py` (com teste `unittest`). Fase futura registrada: quando
+houver API oficial do Metabase, buscar por nome direto na tela.
+
+⚠ **Falta reempacotar o `VisualizadorLDI.exe`** na máquina de dev (PyInstaller):
+`py -m PyInstaller --onefile --clean --name VisualizadorLDI --add-data "ui.html;." --add-data "estoque.html;." visualizador.py`
+Sem isso, o `.exe` serve a UI antiga (o código-fonte `ui.html`/`visualizador.py` já está novo).
+
+Projeto agora versionado em `github.com/clovissabino-oss/videosldi`
+(branch de trabalho `feat/painel-cookie-extracao`).
+
 ---
 
 ## 🔑 Coisas que a próxima sessão PRECISA saber
