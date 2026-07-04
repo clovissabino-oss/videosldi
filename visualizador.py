@@ -32,6 +32,7 @@ from flask import Flask, jsonify, request, send_file
 # reusa as funções do extrator (mesma pasta)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import extrator_ldi as ex
+import config_util
 
 # PASTA_APP = onde ficam cookie.txt/config.json/saida (ao lado do .py ou do .exe)
 PASTA_APP = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -72,7 +73,12 @@ def _status_cookie(probar=True):
         "expira_em": "",
         "dias_restantes": None,
         "atualizado_em": "",
+        "termo": "",
     }
+    try:
+        info["termo"] = ex.carregar_config().get("termo_busca", "")
+    except SystemExit:
+        pass
     if not info["existe"]:
         return info
     info["atualizado_em"] = datetime.fromtimestamp(
@@ -114,6 +120,9 @@ def api_cookie_salvar():
         return jsonify({"erro": "Isso não parece um cookie — copie o valor inteiro da linha 'cookie:' do DevTools."}), 400
     with open(os.path.join(PASTA_APP, "cookie.txt"), "w", encoding="utf-8") as f:
         f.write(novo + "\n")
+    termo = (corpo.get("termo") or "").strip()
+    if termo:
+        config_util.atualizar_termo(os.path.join(PASTA_APP, "config.json"), termo)
     return jsonify(_status_cookie(probar=True))
 
 
