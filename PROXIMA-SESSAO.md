@@ -1,0 +1,185 @@
+# 🎬 Extrator LDI — Estado atual (norte da próxima sessão)
+
+_Última atualização: 03/07/2026 (sessão 3: copiar/relatório da árvore, seletor de cursos e sugestão automática)._
+
+Este arquivo é o **ponto de partida** de qualquer nova sessão. Para o passo a passo
+de uso, veja o `TUTORIAL.md`. Para a visão do projeto, a memória do Claude
+(`projeto_extrator_ldi_videos.md`).
+
+---
+
+## 🎯 O que este projeto faz
+
+Auditar os **vídeos dos cursos** do novo sistema LDI (Livros Digitais Interativos)
+da Estratégia para a **migração velho × novo**: quais vídeos são gravações antigas
+reaproveitadas e quais são novos. Nasceu porque a tela do admin não deixava filtrar
+nem ver essas informações.
+
+O ciclo tem **3 etapas** (3 executáveis / .bat), todos em
+`C:\⚙️ Projetos_Dev\🎬 EXTRATOR_LDI_VIDEOS`:
+
+1. **`ExtratorLDI.exe`** — extrai do admin LDI a árvore Cursos→Capítulos→Aulas→Vídeos
+   (com ID, duração, tamanho, data de entrada no acervo) → gera CSV+JSON em `saida\`.
+2. **`_depara_metabase.bat`** — casa o ID antigo de cada vídeo com o Metabase
+   (question 19885 "Videos BO") e acrescenta a **data real de gravação** + árvore antiga.
+3. **`VisualizadorLDI.exe`** — tela analítica (árvore, filtros, gráficos, detalhes,
+   análises salvas, cookie na tela). Abre no navegador em `http://127.0.0.1:8765`.
+
+**Fluxo para um concurso novo:** ExtratorLDI (ou 🔄 na tela, mudando o termo) →
+`_depara_metabase.bat` → VisualizadorLDI.
+
+---
+
+## ✅ Status: CONCLUÍDO e validado para a PRF (02/07/2026)
+
+- **28 cursos** com vídeo, **3.570 vídeos** (2.741 únicos), **1.744h**, 540 GB.
+- De→para Metabase: **3.438 casados (99,3%** dos que têm ID antigo).
+  - 3.267 com duração idêntica (alta confiança);
+  - **89 regravações** detectadas (mesmo vídeo, duração diferente = sinal velho×novo);
+  - **3 casamentos ambíguos** para revisão manual (IDs 125237 e 182127);
+  - 24 sem casar + 108 sem ID no nome.
+- Gravação real vai de **2016 a 2026, pico em 2022 (1.173)** — enquanto a entrada no
+  acervo novo foi só em 2023/24. Esse é o mapa de regravação.
+
+Dataset atual: `saida\videos_PRF_2026-07-02.json` (+ .csv), já com todas as colunas.
+
+## ✅ Sessão 2 (02/07 noite): propostas de substituição + cast fora
+
+1. **Blocos "cast" fora da análise por padrão** (dados não batem — decisão do Luiz).
+   Checkbox `cast` em "Tipo de bloco" começa desmarcado; dá para religar na mão.
+   O snapshot de "vídeos atuais" das propostas também respeita esse filtro.
+2. **📝 Propostas de substituição de vídeos** — a novidade grande:
+   - Botão **📝** (hover) em **capítulo, aula ou vídeo** na árvore → formulário com
+     os vídeos atuais daquele ponto (nome/duração/ano grav./ID) + cadastro dos
+     **vídeos propostos (nome + ID)** + observação + status (🟡 proposta /
+     🔵 enviada / 🟢 atendida). Selo **💡 N proposto(s)** aparece no alvo.
+   - **📋 Central** no topo: lista tudo por curso, edita, exclui.
+   - **📄 Relatório HTML** standalone e limpo (curso → alvo → atuais × propostos +
+     obs) para divulgar aos times — baixa 1 arquivo; Ctrl+P vira PDF. Também tem
+     **⬇ CSV** (uma linha por vídeo proposto).
+   - Persistência: `propostas.json` ao lado do app; endpoints Flask
+     `/api/propostas` (GET/POST/excluir), upsert por `id` (uuid), preserva
+     `criada_em`. Chave do alvo: capítulo `curso_id::capitulo_id`, aula
+     `curso_id::item_id`, vídeo `bloco_id`. Snapshot `videos_atuais` é gravado na
+     proposta (o relatório fica autossuficiente mesmo trocando a extração).
+   - Testado ponta a ponta (API + UI no Chrome com dados da PRF). Ficou **1
+     proposta de EXEMPLO** cadastrada (capítulo de Estrutura Organizacional do
+     curso de Administração PRF, marcada "pode excluir") para o Luiz ver o fluxo.
+3. Nomes de arquivo exportados agora usam data local (antes toISOString/UTC
+   virava o dia seguinte à noite).
+
+## ✅ Sessão 3 (03/07 manhã): tabela compartilhável + sugestão automática
+
+1. **⧉ Copiar** (barra da árvore): tabela filtrada em TSV na área de transferência
+   (cola direto no Excel/Sheets). **📄 Relatório** (barra da árvore): HTML único no
+   mesmo layout da tela (hierarquia + selos + KPIs + filtros ativos no cabeçalho).
+2. **Seletor de cursos** nos filtros (checkbox múltiplo com busca; vazio = todos).
+   Entra no estado das análises salvas (`cursos`).
+3. **🤖 Sugerir do estoque** (botão no formulário de proposta) — a automação:
+   - Fonte: o próprio cache `saida\metabase_depara.json.gz` (283.762 vídeos únicos,
+     ~540 mil linhas da question 19885) = **árvore/estoque dos professores**.
+   - Backend novo em `visualizador.py`: `/api/estoque/status`, `/raizes`,
+     `/topicos` (ranqueados por semelhança com o nome do alvo) e `POST /sugerir`
+     (similaridade de nome: SequenceMatcher + Jaccard de palavras sobre nomes
+     normalizados — sem acento/caixa/numeração/IDs; validado: "Noções Inciais"
+     × "Noções Iniciais - 83480" = 0.97).
+   - UI: escolher professor → marcar tópicos (o mais parecido já vem marcado) →
+     buscar → pré-marca prováveis regravações (sim ≥ 0.75 e ID ≠ atuais); mesmo
+     ID = "já está no alvo"; ➕ adiciona nome+ID na proposta.
+   - Cache em memória no servidor (primeira chamada demora alguns segundos).
+   - ⚠ O cache ATUAL guarda só 1 caminho por vídeo (`path`). O `depara_metabase.py`
+     já foi atualizado para guardar TODOS (`paths`, limite 12) — **vale a partir do
+     próximo `--refresh` com Warp ativo**. A tela avisa quando o cache é do formato
+     antigo. Backend lê os dois formatos.
+4. **✏️ Preencher IDs (modo coluna)** — feedback do Luiz: o modal era moroso; o
+   fluxo real dele é digitar ID a ID direto na árvore. Botão na barra da árvore
+   liga o modo; input inline em capítulo/aula/vídeo; Tab/Enter salva a proposta
+   automaticamente e resolve o **nome pelo ID** via `POST /api/estoque/resolver`
+   (borda verde = ok, amarela = ID fora do estoque; esvaziar = exclui, preservando
+   obs/nomes manuais). Sem re-render da árvore no save (não perde o foco).
+5. **🌳 Estoque** — página nova `estoque.html` servida em `/estoque` (aba própria,
+   para usar lado a lado): professor → tópicos → vídeos com botão **⧉ copiar ID**.
+   Reusa os endpoints de estoque. Embutida no exe (2º `--add-data`).
+6. **Fonte do estoque trocada (pedido do Luiz)** — preferencial agora são as
+   **árvores `arvore_*.xlsx`** de `C:\⚙️ Aplicativos\🦉 Relatório de Cursos - Árvores
+   - Professores\6. Limpeza Unificada de Dados\downloads_metabase` (93 professores,
+   95 mil vídeos, **todos os caminhos** por vídeo — resolveu a limitação de 1 path
+   sem precisar de Warp). A question 19885 (gz) fica só de **cobertura** para
+   professores sem xlsx. Consolidação com cache próprio em
+   `saida\estoque_arvores.json.gz` (invalida sozinho quando aparecer xlsx novo —
+   pega sempre o mais recente por professor; subpasta `_arquivados_*` é ignorada).
+   Professores com árvore fresca ganham selo **🌿** nas listas. Leitura 100% read-only
+   da pasta da Limpeza. Na mesma pasta há também `cursos_T_*.csv` /
+   `cursos_consolidado_*.csv` (curso antigo → vídeos; até 1 GB) — ainda NÃO usados;
+   possível fonte futura.
+7. **Professor detectado pelos vídeos, não pelo nome do curso (pedido do Luiz:
+   "constitucional é a Fauth")** — o modal 🤖 agora vota nas raízes `mb_raiz` dos
+   vídeos já vinculados ao alvo e mostra chips "🎯 detectado pelos vídeos
+   vinculados"; clicar já carrega a árvore certa. Zero risco de árvore errada.
+   O resolver do preenchimento inline avisa "⚠fora da árvore atual" quando o ID
+   existe na base ampla mas não na árvore vigente do professor.
+8. **↗ Link para o LDI Admin** na linha do curso (só no curso, antes do nome):
+   `https://admin.estrategia.com/#/concursos/ecommerce/produtos/{curso_id}`.
+   ⚠ O admin (SPA) perde o `#/...` no redirect de login e cai na raiz — por isso o
+   clique também COPIA o link (toast orienta a colar na barra de endereço).
+9. **Filtro "Cursos" desconta os removidos (✕)** — `renderListaCursos` filtra
+   `excluidos`, `removerCurso` tira o id de `cursosAtivos`, e
+   `atualizarCampoExcluidos` re-renderiza a lista (restaurar também atualiza).
+
+---
+
+## 🔑 Coisas que a próxima sessão PRECISA saber
+
+### Cookies (dois sistemas, dois cookies diferentes)
+- **LDI (admin)**: `cookie.txt` na pasta do projeto. Só o `__Secure-SID` importa,
+  vale **~30 dias** (o atual expira **01/08/2026**). Trocar pela tela do Visualizador
+  (botão 🍪) ou editando o arquivo.
+- **Metabase**: reusa a auth do app de Limpeza em
+  `C:\⚙️ Aplicativos\🦉 Relatório de Cursos - Árvores - Professores\6. Limpeza Unificada de Dados`
+  (`metabase_cookies.json` de lá). Cookie do Cloudflare vale **~24h** e **exige o Warp
+  ativo**. Recarregar colando o header em `cookies.txt` DENTRO da pasta da Limpeza
+  (o app apaga o arquivo após ler, por segurança).
+
+### Armadilhas já resolvidas (não repetir)
+- **ID com ponto de milhar**: o ID antigo aparece no nome como `videosintra248.487`
+  (= 248487). A regex antiga parava no ponto e casava o vídeo errado. **Já corrigido**
+  (pega só dígitos). Se mexer na extração de ID, manter isso em extrator+ui+depara.
+- **Prova por duração**: `depara_confere` compara a duração LDI×Metabase. O Metabase às
+  vezes arredonda ao minuto (`:00`) → tolerância adaptativa (60s se arredondado, senão 5s).
+- **Question 19885 ignora o parâmetro `id_video` via API** → baixamos a tabela inteira
+  (~540 mil linhas, ~1 min) e casamos localmente. Cache gzip 7 dias em
+  `saida\metabase_depara.json.gz`.
+- **Porta 8765 aceita bind duplo no Windows**: se a tela servir código velho, matar
+  instâncias antigas de python/VisualizadorLDI (conferir CommandLine — NÃO tocar no
+  python de `src\backend\app.py`, que é outro app).
+- Ao mudar `ui.html` ou `visualizador.py`, **reempacotar** o VisualizadorLDI.exe
+  (a ui.html vai embutida via `--add-data`).
+
+---
+
+## 🚧 Backlog / próximos passos possíveis
+
+1. **Revisar os 3 casamentos ambíguos** (filtro "Casados mas duração diverge ⚠" na tela).
+2. **Outros concursos** (PF, Receita…): mudar o termo e rodar o mesmo ciclo.
+3. **Expandir para o sistema inteiro** (~123 mil cursos): trocar CSV/JSON por **SQLite
+   local** (padrão do MEU_NOTION), primeira carga noturna retomável + sync incremental
+   diário via `updated_at`. Fundação já pronta; é a evolução natural.
+4. Opcional: botão "importar de→para" na tela e/ou agendamento diário do ciclo completo.
+
+---
+
+## 🗂️ Arquivos da pasta (referência)
+
+| Arquivo | O quê |
+|---|---|
+| `ExtratorLDI.exe` / `extrator_ldi.py` | Extração do LDI |
+| `depara_metabase.py` / `_depara_metabase.bat` | Cruzamento com o Metabase |
+| `VisualizadorLDI.exe` / `visualizador.py` + `ui.html` | Tela analítica |
+| `estoque.html` (rota `/estoque`) | Árvore de vídeos dos professores p/ consulta e copiar IDs |
+| `config.json` | termo_busca, filtro_local, pasta_saida |
+| `cookie.txt` | Cookie do admin LDI (só `__Secure-SID` conta) |
+| `analises.json` | Análises salvas na tela (contextos nomeados) |
+| `propostas.json` | Propostas de substituição de vídeos (cadastradas na tela) |
+| `EXTRATOR-LDI-VIDEOS.js` | Plano B: extração pelo console do navegador |
+| `saida\` | CSVs/JSONs de resultado + cache do de→para |
+| `TUTORIAL.md` | Passo a passo leigo de tudo |

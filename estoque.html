@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>🌳 Estoque do professor — Vídeos LDI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --roxo:#7C3AED; --roxo-esc:#5B21B6; --roxo-claro:#EDE9FE;
+    --fundo:#F6F5FA; --card:#FFFFFF; --borda:#E5E3EF;
+    --texto:#1F2130; --texto2:#6B6E85; --verde:#16A34A; --amarelo:#D97706;
+    --vermelho:#DC2626;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{font:14px/1.45 "Segoe UI",system-ui,sans-serif; background:var(--fundo);
+       color:var(--texto); padding:16px 18px; max-width:1000px; margin:0 auto}
+  button{font:inherit; cursor:pointer}
+  h1{font-size:17px; margin-bottom:2px}
+  h1 small{color:var(--texto2); font-weight:400; font-size:12px; margin-left:6px}
+  .ajuda{font-size:11.5px; color:var(--texto2); margin:4px 0 12px}
+  input[type=text]{font:inherit; padding:6px 10px; border:1px solid var(--borda);
+       border-radius:8px; background:#fff; width:100%; outline:none}
+  input[type=text]:focus{border-color:var(--roxo)}
+  .cartao{background:var(--card); border:1px solid var(--borda); border-radius:12px;
+          padding:13px 15px; margin-bottom:12px}
+  .cartao label{display:block; font-size:12px; font-weight:600; color:var(--texto2);
+                margin-bottom:5px}
+  .lista-raiz{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; max-height:130px;
+              overflow:auto}
+  .raiz{padding:4px 12px; border-radius:999px; border:1px solid var(--borda);
+        background:#fff; font-size:12.5px}
+  .raiz:hover{border-color:var(--roxo); background:var(--roxo-claro)}
+  .raiz.ativo{background:var(--roxo); color:#fff; border-color:var(--roxo)}
+  .raiz .n{opacity:.65; font-size:11px}
+  .topico{border-bottom:1px solid #F1F0F7}
+  .topico-cab{display:flex; align-items:center; gap:8px; padding:7px 6px; cursor:pointer;
+              font-size:13px}
+  .topico-cab:hover{background:#FAF9FE}
+  .seta{width:14px; color:var(--texto2); font-size:11px; transition:transform .15s;
+        flex-shrink:0; text-align:center}
+  .topico.aberto > .topico-cab .seta{transform:rotate(90deg)}
+  .topico-cab .nm{flex:1; min-width:0; white-space:nowrap; overflow:hidden;
+                  text-overflow:ellipsis}
+  .badge{font-size:10.5px; padding:1.5px 8px; border-radius:999px; white-space:nowrap;
+         background:var(--fundo); color:var(--texto2); flex-shrink:0}
+  .badge.roxo{background:var(--roxo-claro); color:var(--roxo-esc)}
+  .badge.verde{background:#DCFCE7; color:#166534}
+  .badge.ambar{background:#FEF3C7; color:#92400E}
+  .videos{display:none; padding:2px 0 8px 24px}
+  .topico.aberto > .videos{display:block}
+  .vid{display:flex; align-items:center; gap:8px; padding:3.5px 6px; font-size:12.6px;
+       border-radius:6px}
+  .vid:hover{background:var(--roxo-claro)}
+  .vid .nm{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .vid .meta{color:var(--texto2); font-size:11.5px; flex-shrink:0; white-space:nowrap}
+  .btn-id{border:1px solid var(--borda); background:#fff; border-radius:7px;
+          padding:2px 10px; font-size:11.5px; font-family:Consolas,monospace;
+          flex-shrink:0; white-space:nowrap}
+  .btn-id:hover{background:var(--roxo); color:#fff; border-color:var(--roxo)}
+  .vazio{padding:26px; text-align:center; color:var(--texto2)}
+  #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+         background:var(--texto); color:#fff; padding:10px 20px; border-radius:10px;
+         opacity:0; transition:opacity .3s; z-index:200; pointer-events:none}
+  #toast.mostrar{opacity:1}
+</style>
+</head>
+<body>
+
+<h1>🌳 Estoque do professor <small>árvore antiga — somente consulta</small></h1>
+<div class="ajuda" id="infoCache">carregando base do estoque...</div>
+
+<div class="cartao">
+  <label>Professor (raiz da árvore)</label>
+  <input type="text" id="qRaiz" placeholder="digite parte do nome do professor..."
+         oninput="buscaDebounce()">
+  <div class="lista-raiz" id="raizes"></div>
+</div>
+
+<div class="cartao" id="cartaoTopicos" style="display:none">
+  <label>Tópicos de <span id="nomeRaiz"></span> — clique para ver os vídeos;
+    <b>⧉</b> copia o ID para colar no Visualizador</label>
+  <input type="text" id="qTopico" placeholder="filtrar tópicos..."
+         oninput="renderTopicos()" style="margin-bottom:6px">
+  <div id="topicos"><div class="vazio">escolha um professor acima</div></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+      c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let RAIZ = "", TOPICOS = [], deb = null;
+let toastTimer = null;
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("mostrar");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("mostrar"), 2600);
+}
+function buscaDebounce(){
+  clearTimeout(deb);
+  deb = setTimeout(buscarRaizes, 300);
+}
+async function buscarRaizes(){
+  const q = $("qRaiz").value.trim();
+  let r;
+  try{ r = await fetch("/api/estoque/raizes?q=" + encodeURIComponent(q)); }
+  catch(e){ return; }
+  if (!r.ok){
+    const e = await r.json().catch(() => ({}));
+    $("raizes").innerHTML = `<span class="ajuda">${esc(e.erro || "erro ao consultar")}</span>`;
+    return;
+  }
+  const lista = await r.json();
+  $("raizes").innerHTML = lista.map(x =>
+    `<button class="raiz ${RAIZ === x.raiz ? "ativo" : ""}"
+       title="${x.fresca ? "árvore atual (xlsx da Limpeza)" : "base ampla (question 19885)"}"
+       onclick="escolherRaiz(this.dataset.raiz)" data-raiz="${esc(x.raiz)}">
+       ${x.fresca ? "🌿 " : ""}${esc(x.raiz)} <span class="n">· ${x.n}</span></button>`).join("")
+    || "<span class='ajuda'>nenhum professor encontrado — tente outra parte do nome</span>";
+}
+async function escolherRaiz(raiz){
+  RAIZ = raiz;
+  document.querySelectorAll(".raiz").forEach(b =>
+    b.classList.toggle("ativo", b.dataset.raiz === raiz));
+  $("cartaoTopicos").style.display = "block";
+  $("nomeRaiz").textContent = raiz;
+  $("topicos").innerHTML = "<div class='vazio'>carregando tópicos...</div>";
+  const r = await fetch("/api/estoque/topicos?raiz=" + encodeURIComponent(raiz));
+  TOPICOS = r.ok ? await r.json() : [];
+  // ordem natural da árvore (sem alvo de semelhança aqui)
+  const chaveNat = s => String(s || "").split(/(\d+)/).map(t => /^\d+$/.test(t) ? t.padStart(8, "0") : t.toLowerCase()).join("");
+  TOPICOS.sort((a, b) => chaveNat(a.path) < chaveNat(b.path) ? -1 : 1);
+  TOPICOS.forEach(t => { t.aberto = false; t.vids = null; });
+  $("qTopico").value = "";
+  renderTopicos();
+}
+function renderTopicos(){
+  const busca = ($("qTopico").value || "").toLowerCase();
+  const vis = TOPICOS.map((t, i) => ({t, i}))
+    .filter(({t}) => !busca || t.path.toLowerCase().includes(busca));
+  if (!vis.length){
+    $("topicos").innerHTML = "<div class='vazio'>nenhum tópico</div>";
+    return;
+  }
+  $("topicos").innerHTML = vis.map(({t, i}) => `
+    <div class="topico ${t.aberto ? "aberto" : ""}" id="top-${i}">
+      <div class="topico-cab" onclick="toggleTopico(${i})">
+        <span class="seta">▶</span>
+        <span class="nm" title="${esc(t.path)}">${esc(t.path)}</span>
+        <span class="badge roxo">${t.n} vídeo(s)</span>
+      </div>
+      <div class="videos" id="vids-${i}">${t.vids ? htmlVideos(t.vids) : ""}</div>
+    </div>`).join("");
+}
+async function toggleTopico(i){
+  const t = TOPICOS[i];
+  t.aberto = !t.aberto;
+  const no = $("top-" + i);
+  if (no) no.classList.toggle("aberto", t.aberto);
+  if (t.aberto && t.vids == null){
+    const alvo = $("vids-" + i);
+    if (alvo) alvo.innerHTML = "<div class='vazio' style='padding:8px'>carregando...</div>";
+    const r = await fetch("/api/estoque/sugerir", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({raiz: RAIZ, paths: [t.path], atuais: []})});
+    t.vids = r.ok ? ((await r.json()).itens || []) : [];
+    if (alvo) alvo.innerHTML = htmlVideos(t.vids);
+  }
+}
+function htmlVideos(vids){
+  if (!vids.length) return "<div class='vazio' style='padding:8px'>sem vídeos</div>";
+  return vids.map(v => `
+    <div class="vid">
+      <button class="btn-id" title="copiar o ID ${esc(v.id)}"
+              onclick="copiarId('${esc(v.id)}')">⧉ ${esc(v.id)}</button>
+      <span class="nm" title="${esc(v.titulo)}">${esc(v.titulo) || "(sem título)"}</span>
+      ${v.ano ? `<span class="badge verde">🎥 ${esc(v.ano)}</span>` : ""}
+      ${v.status && v.status !== "Disponível" ? `<span class="badge ambar">${esc(v.status)}</span>` : ""}
+      <span class="meta">${esc(v.dur)}</span>
+      ${v.n_locais > 1 ? `<span class="badge">${v.n_locais} locais</span>` : ""}
+    </div>`).join("");
+}
+function copiarId(id){
+  navigator.clipboard.writeText(id).then(
+    () => toast(`ID ${id} copiado — cole no campo "IDs p/ substituir" do Visualizador.`),
+    () => toast("Não consegui copiar — selecione e copie manualmente."));
+}
+
+(async function init(){
+  try{
+    const s = await (await fetch("/api/estoque/status")).json();
+    $("infoCache").innerHTML = s.existe
+      ? `Estoque: <b>${(s.n_arvores || 0).toLocaleString("pt-BR")}</b> vídeos em
+         <b>${s.n_profs_frescos || 0}</b> árvores atuais 🌿 (xlsx da pasta da Limpeza) +
+         <b>${(s.n_videos - (s.n_arvores || 0)).toLocaleString("pt-BR")}</b> da base ampla
+         (question 19885) · atualizado em <b>${esc(s.atualizado_em)}</b>`
+      : `<span style="color:var(--vermelho)">⚠ Nenhuma fonte de estoque — exporte as
+         árvores na Limpeza ou rode o _depara_metabase.bat.</span>`;
+  } catch(e){
+    $("infoCache").textContent = "servidor fora do ar?";
+  }
+  buscarRaizes();
+})();
+</script>
+</body>
+</html>

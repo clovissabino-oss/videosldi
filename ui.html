@@ -1,0 +1,2051 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>🎬 Vídeos LDI — Visualizador</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --roxo:#7C3AED; --roxo-esc:#5B21B6; --roxo-claro:#EDE9FE;
+    --fundo:#F6F5FA; --card:#FFFFFF; --borda:#E5E3EF;
+    --texto:#1F2130; --texto2:#6B6E85; --verde:#16A34A; --amarelo:#D97706;
+    --vermelho:#DC2626; --azul:#2563EB;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{font:14px/1.45 "Segoe UI",system-ui,sans-serif; background:var(--fundo); color:var(--texto)}
+  button{font:inherit; cursor:pointer}
+
+  /* ---------- header ---------- */
+  header{display:flex; align-items:center; gap:12px; padding:10px 18px;
+         background:var(--card); border-bottom:1px solid var(--borda);
+         position:sticky; top:0; z-index:50}
+  header h1{font-size:17px; white-space:nowrap}
+  header h1 small{color:var(--texto2); font-weight:400; font-size:12px; margin-left:6px}
+  .hspacer{flex:1}
+  select,input[type=text],input[type=number],textarea{
+    font:inherit; padding:6px 9px; border:1px solid var(--borda); border-radius:8px;
+    background:#fff; color:var(--texto); outline:none}
+  select:focus,input:focus,textarea:focus{border-color:var(--roxo)}
+  .btn{display:inline-flex; align-items:center; gap:6px; padding:7px 13px;
+       border-radius:8px; border:1px solid var(--borda); background:#fff}
+  .btn:hover{background:var(--roxo-claro); border-color:var(--roxo)}
+  .btn.primario{background:var(--roxo); border-color:var(--roxo); color:#fff}
+  .btn.primario:hover{background:var(--roxo-esc)}
+  .pill{display:inline-flex; align-items:center; gap:7px; padding:6px 12px;
+        border-radius:999px; border:1px solid var(--borda); background:#fff; font-size:13px}
+  .pill .dot{width:9px; height:9px; border-radius:50%; background:#999}
+  .pill.ok .dot{background:var(--verde)} .pill.aviso .dot{background:var(--amarelo)}
+  .pill.erro .dot{background:var(--vermelho)}
+
+  /* ---------- layout ---------- */
+  .app{display:grid; grid-template-columns:270px 1fr; gap:14px; padding:14px 18px;
+       align-items:start}
+  .app.com-detalhe{grid-template-columns:270px 1fr 360px}
+
+  /* ---------- filtros ---------- */
+  aside.filtros{background:var(--card); border:1px solid var(--borda); border-radius:12px;
+                padding:14px; position:sticky; top:64px; max-height:calc(100vh - 80px);
+                overflow:auto}
+  aside.filtros h2{font-size:12px; text-transform:uppercase; letter-spacing:.06em;
+                   color:var(--texto2); margin-bottom:10px}
+  .campo{margin-bottom:13px}
+  .campo label{display:block; font-size:12px; font-weight:600; color:var(--texto2);
+               margin-bottom:4px}
+  .campo input[type=text],.campo select{width:100%}
+  .linha2{display:flex; gap:8px}
+  .linha2 input{width:50%}
+  .chips{display:flex; flex-wrap:wrap; gap:5px}
+  .chip{padding:3px 10px; border-radius:999px; border:1px solid var(--borda);
+        background:#fff; font-size:12px}
+  .chip.ativo{background:var(--roxo); color:#fff; border-color:var(--roxo)}
+  .caixa-check{max-height:150px; overflow:auto; border:1px solid var(--borda);
+               border-radius:8px; padding:6px 8px; background:#fff}
+  .caixa-check label{display:flex; gap:6px; align-items:center; font-size:12.5px;
+                     font-weight:400; color:var(--texto); padding:2px 0; cursor:pointer}
+  .check-linha{display:flex; gap:6px; align-items:center; font-size:13px; cursor:pointer}
+
+  /* ---------- principal ---------- */
+  main{min-width:0}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+        gap:10px; margin-bottom:12px}
+  .kpi{background:var(--card); border:1px solid var(--borda); border-radius:12px;
+       padding:11px 14px}
+  .kpi .num{font-size:21px; font-weight:700; color:var(--roxo-esc)}
+  .kpi .rot{font-size:11.5px; color:var(--texto2)}
+  .graficos{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px}
+  @media(max-width:1100px){.graficos{grid-template-columns:1fr}}
+  .grafico{background:var(--card); border:1px solid var(--borda); border-radius:12px;
+           padding:13px 15px}
+  .grafico h3{font-size:13px; margin-bottom:9px; color:var(--texto2)}
+  .barra-linha{display:flex; align-items:center; gap:8px; margin:4px 0; font-size:12px}
+  .barra-linha .rotulo{width:78px; text-align:right; color:var(--texto2);
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0}
+  .barra-linha .rotulo.largo{width:180px}
+  .barra-trilho{flex:1; background:var(--fundo); border-radius:5px; height:16px;
+                overflow:hidden; cursor:pointer}
+  .barra{height:100%; background:var(--roxo); border-radius:5px; min-width:2px;
+         transition:width .3s}
+  .barra-linha .valor{width:70px; font-weight:600; flex-shrink:0}
+
+  /* ---------- árvore ---------- */
+  .arvore-caixa{background:var(--card); border:1px solid var(--borda); border-radius:12px}
+  .arvore-topo{display:flex; align-items:center; gap:10px; padding:10px 15px;
+               border-bottom:1px solid var(--borda)}
+  .arvore-topo b{font-size:13.5px}
+  .no{border-bottom:1px solid #F1F0F7}
+  .no-cab{display:flex; align-items:center; gap:8px; padding:8px 14px; cursor:pointer}
+  .no-cab:hover{background:#FAF9FE}
+  .seta{width:16px; text-align:center; color:var(--texto2); font-size:11px;
+        transition:transform .15s; flex-shrink:0}
+  .aberto > .no-cab .seta{transform:rotate(90deg)}
+  .no-nome{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .no-curso > .no-cab .no-nome{font-weight:600}
+  .no-filhos{display:none}
+  .aberto > .no-filhos{display:block}
+  .no-cap > .no-cab{padding-left:34px; font-size:13.5px}
+  .no-aula > .no-cab{padding-left:56px; font-size:13px; color:#33364a}
+  .lin-video{display:flex; align-items:center; gap:9px; padding:5px 14px 5px 82px;
+             font-size:12.8px; cursor:pointer}
+  .lin-video:hover{background:var(--roxo-claro)}
+  .lin-video.selecionado{background:var(--roxo-claro); box-shadow:inset 3px 0 0 var(--roxo)}
+  .lin-video .vnome{flex:1; min-width:0; white-space:nowrap; overflow:hidden;
+                    text-overflow:ellipsis}
+  .badge{font-size:10.5px; padding:1.5px 8px; border-radius:999px; white-space:nowrap;
+         background:var(--fundo); color:var(--texto2); flex-shrink:0}
+  .badge.roxo{background:var(--roxo-claro); color:var(--roxo-esc)}
+  .badge.ambar{background:#FEF3C7; color:#92400E}
+  .badge.verm{background:#FEE2E2; color:#991B1B}
+  .badge.azul{background:#DBEAFE; color:#1E40AF}
+  .badge.cinza{background:#F3F4F6; color:#4B5563}
+  .meta{color:var(--texto2); font-size:11.5px; flex-shrink:0; white-space:nowrap}
+  .vazio{padding:40px; text-align:center; color:var(--texto2)}
+
+  /* ---------- detalhes ---------- */
+  aside.detalhe{background:var(--card); border:1px solid var(--borda); border-radius:12px;
+                padding:16px; position:sticky; top:64px; max-height:calc(100vh - 80px);
+                overflow:auto}
+  aside.detalhe h2{font-size:14.5px; margin-bottom:3px}
+  aside.detalhe .sub{font-size:12px; color:var(--texto2); margin-bottom:12px}
+  .det-grupo{margin-bottom:12px}
+  .det-grupo h4{font-size:11px; text-transform:uppercase; letter-spacing:.05em;
+                color:var(--roxo-esc); margin-bottom:5px}
+  .det-linha{display:flex; gap:8px; padding:3px 0; font-size:12.8px; align-items:baseline}
+  .det-linha .k{width:118px; color:var(--texto2); flex-shrink:0}
+  .det-linha .v{flex:1; min-width:0; word-break:break-all}
+  .copiar{border:none; background:none; color:var(--roxo); font-size:11px; padding:0 3px}
+  .copiar:hover{text-decoration:underline}
+  .fechar-det{float:right; border:none; background:none; font-size:17px; color:var(--texto2)}
+  .btn-x{border:none; background:none; color:var(--texto2); font-size:12px; padding:2px 7px;
+         border-radius:6px; flex-shrink:0; opacity:.45}
+  .no-cab:hover .btn-x{opacity:1}
+  .btn-x:hover{background:#FEE2E2; color:var(--vermelho)}
+  .exc-item{display:flex; align-items:center; gap:6px; font-size:12px; padding:2px 0}
+  .exc-item .nm{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .analise-item{display:flex; align-items:center; gap:8px; padding:7px 4px;
+                border-bottom:1px solid var(--borda); font-size:13px}
+  .analise-item .nm{flex:1; min-width:0}
+  .analise-item .dt{color:var(--texto2); font-size:11.5px}
+
+  /* ---------- propostas de substituição ---------- */
+  .badge.verde{background:#DCFCE7; color:#166534}
+  .btn-prop{border:none; background:none; font-size:12px; padding:2px 6px;
+            border-radius:6px; flex-shrink:0; opacity:.35}
+  .no-cab:hover .btn-prop, .lin-video:hover .btn-prop{opacity:1}
+  .btn-prop:hover{background:var(--roxo-claro)}
+  .prop-linha{display:flex; gap:6px; margin:5px 0; align-items:center}
+  .prop-linha input.pnome{flex:1}
+  .prop-linha input.pid{width:130px}
+  .prop-atuais{max-height:150px; overflow:auto; border:1px solid var(--borda);
+               border-radius:8px; padding:7px 10px; background:var(--fundo);
+               font-size:12px}
+  .prop-atuais div{padding:1.5px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .prop-item{border:1px solid var(--borda); border-radius:10px; padding:10px 12px;
+             margin-bottom:8px; font-size:12.8px}
+  .prop-item .loc{color:var(--texto2); font-size:11.5px; margin:2px 0 5px}
+  .prop-item b.alvo{font-size:13px}
+
+  /* ---------- link p/ o curso no LDI Admin ---------- */
+  .btn-ldi{display:inline-flex; align-items:center; justify-content:center;
+           width:22px; height:22px; border-radius:6px; flex-shrink:0;
+           border:1px solid var(--borda); background:#fff; color:var(--roxo);
+           font-size:12px; text-decoration:none}
+  .btn-ldi:hover{background:var(--roxo); color:#fff; border-color:var(--roxo)}
+
+  /* ---------- preenchimento inline de IDs ---------- */
+  .prop-inline{width:200px; padding:3px 8px; font-size:12px; border:1px dashed #C9C5DD;
+               border-radius:7px; flex-shrink:0; background:#FFFDF5; font:inherit}
+  .prop-inline:focus{border-color:var(--roxo); border-style:solid; background:#fff; outline:none}
+  .prop-inline.ok{border-color:var(--verde); border-style:solid; background:#F0FDF4}
+  .prop-inline.parcial{border-color:var(--amarelo); border-style:solid; background:#FFFBEB}
+
+  /* ---------- sugestão automática (estoque) ---------- */
+  .sug-path{font-weight:600; font-size:12.5px; margin:10px 0 4px; color:var(--roxo-esc);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .sug-item{display:flex; align-items:center; gap:8px; padding:4px 6px; font-size:12.6px;
+            border-bottom:1px solid #F1F0F7; border-radius:6px}
+  .sug-item:hover{background:var(--roxo-claro)}
+  .sug-item .nm{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .sug-caixa{max-height:44vh; overflow:auto; border:1px solid var(--borda); border-radius:10px;
+             padding:6px 10px; margin-top:10px}
+
+  /* ---------- modais / toast ---------- */
+  .veu{display:none; position:fixed; inset:0; background:rgba(25,20,50,.45); z-index:100;
+       align-items:center; justify-content:center}
+  .veu.aberto{display:flex}
+  .modal{background:#fff; border-radius:14px; padding:22px; width:min(560px,92vw);
+         max-height:88vh; overflow:auto}
+  .modal h2{font-size:16px; margin-bottom:12px}
+  .modal .acoes{display:flex; justify-content:flex-end; gap:8px; margin-top:16px}
+  .modal textarea{width:100%; height:110px; font-size:11px; font-family:Consolas,monospace}
+  .status-caixa{border:1px solid var(--borda); border-radius:10px; padding:12px;
+                margin-bottom:14px; font-size:13px}
+  .status-caixa .lin{display:flex; justify-content:space-between; padding:2px 0}
+  .prog-trilho{background:var(--fundo); border-radius:6px; height:12px; overflow:hidden;
+               margin:10px 0}
+  .prog-barra{height:100%; background:var(--roxo); width:0%; transition:width .5s}
+  #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+         background:var(--texto); color:#fff; padding:10px 20px; border-radius:10px;
+         opacity:0; transition:opacity .3s; z-index:200; pointer-events:none}
+  #toast.mostrar{opacity:1}
+  .ajuda{font-size:11.5px; color:var(--texto2); margin-top:6px}
+  a{color:var(--roxo)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Vídeos LDI <small>visualizador analítico</small></h1>
+  <select id="selDataset" title="Extração exibida" onchange="carregarDados()"></select>
+  <button class="btn" onclick="abrirModalExtrair()">🔄 Nova extração</button>
+  <select id="selAnalise" title="Carregar análise salva" onchange="carregarAnalise(this.value)"></select>
+  <button class="btn" onclick="abrirModalAnalise()">💾 Análises</button>
+  <button class="btn" id="btnPropostas" onclick="abrirModalPropostas()">📋 Propostas</button>
+  <button class="btn" onclick="window.open('/estoque', '_blank')"
+          title="Abre em outra aba a árvore de vídeos dos professores (estoque) para consultar e copiar IDs">🌳 Estoque</button>
+  <div class="hspacer"></div>
+  <button class="btn" id="btnExportar" onclick="exportarCSV()">⬇ Exportar filtro (CSV)</button>
+  <button class="pill" id="pillCookie" onclick="abrirModalCookie()">
+    <span class="dot"></span><span id="pillCookieTexto">🍪 verificando...</span>
+  </button>
+</header>
+
+<div class="app" id="app">
+  <!-- ==================== FILTROS ==================== -->
+  <aside class="filtros">
+    <h2>Filtros <span id="contFiltro" style="float:right"></span></h2>
+    <div class="campo">
+      <label>Busca livre</label>
+      <input type="text" id="fBusca" placeholder="curso, aula, vídeo, ID intra..."
+             oninput="aplicarFiltrosDebounce()">
+    </div>
+    <div class="campo">
+      <label>Cursos (<span id="nCursosSel">todos</span>)</label>
+      <input type="text" id="fCursoBusca" placeholder="filtrar lista..."
+             oninput="renderListaCursos()" style="margin-bottom:5px">
+      <div class="caixa-check" id="fCursos"></div>
+      <div style="display:flex; gap:6px; margin-top:5px">
+        <button class="btn" style="flex:1; padding:3px 6px; font-size:12px"
+                onclick="selecionarCursos(false)">Limpar seleção</button>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Ano de gravação (real, via de→para)</label>
+      <div class="chips" id="fAnosGrav"></div>
+    </div>
+    <div class="campo">
+      <label>Ano de entrada no acervo</label>
+      <div class="chips" id="fAnos"></div>
+    </div>
+    <div class="campo">
+      <label>De→para Metabase</label>
+      <select id="fDepara" onchange="aplicarFiltros()">
+        <option value="">Todos</option>
+        <option value="sim">Casados (com data real)</option>
+        <option value="nao">Não casados ⚠</option>
+        <option value="diverge">Casados mas duração diverge ⚠</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Professor / equipe</label>
+      <input type="text" id="fProfBusca" placeholder="filtrar lista..."
+             oninput="renderListaProf()" style="margin-bottom:5px">
+      <div class="caixa-check" id="fProfs"></div>
+    </div>
+    <div class="campo">
+      <label>Tipo de bloco</label>
+      <div class="caixa-check" id="fTipos" style="max-height:none"></div>
+    </div>
+    <div class="campo">
+      <label>Curso publicado</label>
+      <select id="fPublicado" onchange="aplicarFiltros()">
+        <option value="">Todos</option><option value="sim">Publicados</option>
+        <option value="nao">Não publicados</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Bloco em rascunho</label>
+      <select id="fRascunho" onchange="aplicarFiltros()">
+        <option value="">Todos</option><option value="sim">Só rascunhos</option>
+        <option value="nao">Sem rascunhos</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Duração (minutos)</label>
+      <div class="linha2">
+        <input type="number" id="fDurMin" placeholder="mín" min="0" oninput="aplicarFiltrosDebounce()">
+        <input type="number" id="fDurMax" placeholder="máx" min="0" oninput="aplicarFiltrosDebounce()">
+      </div>
+    </div>
+    <div class="campo">
+      <label>ID do sistema antigo (de→para)</label>
+      <select id="fIdAntigo" onchange="aplicarFiltros()">
+        <option value="">Todos</option>
+        <option value="com">Com ID antigo</option>
+        <option value="sem">Sem ID antigo ⚠</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label class="check-linha"><input type="checkbox" id="fSoErros" onchange="aplicarFiltros()">
+        Só linhas com erro/pendência</label>
+    </div>
+    <div class="campo" id="campoExcluidos" style="display:none">
+      <label>🚫 Cursos removidos (<span id="nExcluidos">0</span>)</label>
+      <div class="caixa-check" id="listaExcluidos"></div>
+      <button class="btn" style="width:100%; margin-top:5px" onclick="restaurarTodos()">Restaurar todos</button>
+    </div>
+    <button class="btn" style="width:100%" onclick="limparFiltros()">Limpar filtros</button>
+  </aside>
+
+  <!-- ==================== PRINCIPAL ==================== -->
+  <main>
+    <div class="kpis" id="kpis"></div>
+    <div class="graficos">
+      <div class="grafico"><h3>🎯 Vídeos por <b>ano de gravação real</b>
+        <small>(via de→para Metabase; clique para filtrar)</small></h3>
+        <div id="grafAnosGrav"></div></div>
+      <div class="grafico"><h3>Vídeos por ano de <b>entrada no acervo novo</b>
+        <small>(data de inclusão no LDI; clique para filtrar)</small></h3>
+        <div id="grafAnos"></div></div>
+      <div class="grafico"><h3>Top 10 cursos por duração total</h3>
+        <div id="grafCursos"></div></div>
+    </div>
+    <div class="arvore-caixa">
+      <div class="arvore-topo">
+        <b>Cursos → Capítulos → Aulas → Vídeos</b>
+        <div class="hspacer" style="flex:1"></div>
+        <button class="btn" id="btnModoPreencher" onclick="toggleModoPreencher()"
+                title="Mostra um campo na frente de cada tópico/aula/vídeo para digitar os IDs de substituição direto">✏️ Preencher IDs</button>
+        <button class="btn" onclick="copiarArvore()" title="Copia a tabela filtrada — cole direto no Excel/Sheets">⧉ Copiar</button>
+        <button class="btn" onclick="gerarRelatorioArvore()" title="Arquivo HTML único no mesmo layout da tela, com os filtros atuais">📄 Relatório</button>
+        <button class="btn" onclick="expandirTudo(true)">Expandir tudo</button>
+        <button class="btn" onclick="expandirTudo(false)">Recolher tudo</button>
+      </div>
+      <div id="arvore"><div class="vazio">Carregando...</div></div>
+    </div>
+  </main>
+
+  <!-- ==================== DETALHES ==================== -->
+  <aside class="detalhe" id="painelDetalhe" style="display:none"></aside>
+</div>
+
+<!-- ==================== MODAL COOKIE ==================== -->
+<div class="veu" id="modalCookie">
+  <div class="modal">
+    <h2>🍪 Cookie da sessão do admin</h2>
+    <div class="status-caixa" id="cookieStatusCaixa">Verificando...</div>
+    <p style="font-size:13px; margin-bottom:8px"><b>Colar um cookie novo:</b>
+       no Chrome logado no admin → F12 → aba <b>Network</b> → F5 → filtre por
+       <code>api.estrategia.com</code> → clique numa linha → <b>Request Headers</b> →
+       copie o valor inteiro da linha <code>cookie:</code> e cole abaixo.</p>
+    <textarea id="cookieNovo" placeholder="cole aqui o cookie completo..."></textarea>
+    <div class="acoes">
+      <button class="btn" onclick="fecharModais()">Fechar</button>
+      <button class="btn primario" onclick="salvarCookie()">Salvar e testar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL EXTRAÇÃO ==================== -->
+<div class="veu" id="modalExtrair">
+  <div class="modal">
+    <h2>🔄 Nova extração</h2>
+    <div class="campo">
+      <label>Termo de busca (palavra exata no nome do curso)</label>
+      <input type="text" id="termoExtrair" placeholder="ex.: PRF" style="width:100%">
+      <div class="ajuda">Para a PRF leva de 2 a 5 minutos. A tela avisa quando terminar
+        e já carrega os dados novos.</div>
+    </div>
+    <div id="extrairProgresso" style="display:none">
+      <div id="extrairEtapa" style="font-size:13px"></div>
+      <div class="prog-trilho"><div class="prog-barra" id="extrairBarra"></div></div>
+      <div id="extrairNums" style="font-size:12px; color:var(--texto2)"></div>
+    </div>
+    <div class="acoes">
+      <button class="btn" onclick="fecharModais()">Fechar</button>
+      <button class="btn primario" id="btnIniciarExtracao" onclick="iniciarExtracao()">Iniciar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL ANÁLISES ==================== -->
+<div class="veu" id="modalAnalise">
+  <div class="modal">
+    <h2>💾 Análises salvas</h2>
+    <p style="font-size:12.5px; color:var(--texto2); margin-bottom:12px">
+      Uma análise guarda o <b>contexto completo</b>: extração selecionada, todos os
+      filtros e os cursos removidos. Fica salva no arquivo <code>analises.json</code>
+      ao lado do aplicativo.</p>
+    <div class="campo">
+      <label>Salvar a análise atual como:</label>
+      <div style="display:flex; gap:8px">
+        <input type="text" id="nomeAnalise" placeholder="ex.: PRF sem intrusos" style="flex:1">
+        <button class="btn primario" onclick="salvarAnalise()">Salvar</button>
+      </div>
+    </div>
+    <div id="listaAnalises"></div>
+    <div class="acoes"><button class="btn" onclick="fecharModais()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- ==================== MODAL PROPOSTA (cadastro) ==================== -->
+<div class="veu" id="modalProposta">
+  <div class="modal" style="width:min(640px,94vw)">
+    <h2>📝 Proposta de substituição de vídeos</h2>
+    <div class="status-caixa" id="propAlvo"></div>
+    <div class="campo">
+      <label>Vídeos atuais (<span id="propNAtuais">0</span>) — o que está no ar hoje</label>
+      <div class="prop-atuais" id="propAtuais"></div>
+    </div>
+    <div class="campo">
+      <label>Vídeos propostos — nome + ID (como o time vai localizar)</label>
+      <div id="propLista"></div>
+      <div style="display:flex; gap:8px; margin-top:4px">
+        <button class="btn" onclick="addLinhaProposto()">+ adicionar vídeo</button>
+        <button class="btn" onclick="abrirModalSugestao()"
+                title="Varre a árvore antiga do professor e sugere substituições por similaridade de nome">
+          🤖 Sugerir do estoque</button>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Observação para o time (opcional)</label>
+      <textarea id="propObs" style="height:64px; font:inherit; font-size:13px"
+        placeholder="ex.: professor regravou todo o tópico em 2026; substituir na ordem indicada"></textarea>
+    </div>
+    <div class="campo">
+      <label>Status</label>
+      <select id="propStatus">
+        <option value="proposta">🟡 Proposta (em elaboração)</option>
+        <option value="enviada">🔵 Enviada ao time</option>
+        <option value="atendida">🟢 Atendida (vídeos trocados)</option>
+      </select>
+    </div>
+    <div class="acoes" style="justify-content:space-between">
+      <button class="btn" id="btnExcluirProposta" style="color:var(--vermelho)"
+              onclick="excluirProposta()">🗑 Excluir proposta</button>
+      <div style="display:flex; gap:8px">
+        <button class="btn" onclick="fecharModais()">Cancelar</button>
+        <button class="btn primario" onclick="salvarProposta()">Salvar proposta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL PROPOSTAS (central) ==================== -->
+<div class="veu" id="modalPropostas">
+  <div class="modal" style="width:min(780px,94vw)">
+    <h2>📋 Propostas de substituição</h2>
+    <p style="font-size:12.5px; color:var(--texto2); margin-bottom:10px">
+      Cadastre pelo botão 📝 na árvore (no capítulo, na aula ou no próprio vídeo).
+      Tudo fica salvo em <code>propostas.json</code> ao lado do aplicativo.
+      O <b>relatório</b> gera um arquivo único e limpo, pronto para enviar aos times
+      (abre em qualquer navegador; Ctrl+P vira PDF).</p>
+    <div id="listaPropostas" style="max-height:52vh; overflow:auto"></div>
+    <div class="acoes">
+      <button class="btn" onclick="exportarPropostasCSV()">⬇ CSV</button>
+      <button class="btn primario" onclick="gerarRelatorioPropostas()">📄 Gerar relatório (HTML)</button>
+      <button class="btn" onclick="fecharModais()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL SUGESTÃO (estoque do professor) ==================== -->
+<div class="veu" id="modalSugestao">
+  <div class="modal" style="width:min(880px,96vw)">
+    <h2>🤖 Sugerir substituições do estoque do professor</h2>
+    <div class="ajuda" id="sugCacheInfo" style="margin:0 0 10px"></div>
+    <div class="campo">
+      <label>1. Professor (raiz da árvore antiga)</label>
+      <div id="sugRaizDetect" style="margin-bottom:5px"></div>
+      <input type="text" id="sugRaizBusca" placeholder="digite parte do nome do professor..."
+             oninput="buscarRaizesDebounce()">
+      <div class="caixa-check" id="sugRaizes" style="margin-top:5px; max-height:120px"></div>
+    </div>
+    <div class="campo" id="campoSugTopicos" style="display:none">
+      <label>2. Tópicos da árvore a varrer (<span id="sugNTop">0</span> marcado(s))</label>
+      <input type="text" id="sugTopBusca" placeholder="filtrar tópicos..."
+             oninput="renderTopicos()" style="margin-bottom:5px">
+      <div class="caixa-check" id="sugTopicos" style="max-height:190px"></div>
+      <div class="ajuda">Ordenados por semelhança com o nome do alvo — os mais parecidos vêm
+        primeiro (o melhor já vem marcado). Marque quantos quiser e clique em buscar.</div>
+      <button class="btn primario" style="margin-top:8px" onclick="buscarSugestoes()">🔎 Buscar sugestões nos tópicos marcados</button>
+    </div>
+    <div id="sugResultados"></div>
+    <div class="acoes">
+      <button class="btn" onclick="voltarProposta()">← Voltar à proposta</button>
+      <button class="btn primario" id="btnAddSug" style="display:none"
+              onclick="adicionarSugestoes()">➕ Adicionar marcados à proposta</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ============================ estado ============================ */
+let LINHAS = [];            // todas as linhas da extração carregada
+let FILTRADAS = [];         // após filtros
+let abertos = new Set();    // nós expandidos da árvore
+let selecionado = null;     // linha selecionada (detalhes)
+let anosAtivos = new Set();     // filtro de anos (entrada no acervo)
+let anosGravAtivos = new Set(); // filtro de anos (gravação real)
+let excluidos = new Map();  // cursos removidos da análise (id -> nome)
+let cursosAtivos = new Set(); // cursos SELECIONADOS no filtro (vazio = todos)
+let CURSOS = [];            // [{id, nome}] da extração carregada
+let ANALISES = [];          // análises salvas (do servidor)
+let analiseAtual = "";      // nome da análise carregada
+let debounceTimer = null;
+let pollExtracao = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+      c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ========================= formatação ========================== */
+function fmtData(iso, comHora){
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const dt = d.toLocaleDateString("pt-BR");
+  return comHora ? dt + " " + d.toLocaleTimeString("pt-BR").slice(0,5) : dt;
+}
+function fmtDur(seg){
+  seg = +seg;
+  if (!seg) return "—";
+  const h = Math.floor(seg/3600), m = Math.floor(seg%3600/60), s = Math.round(seg%60);
+  return (h ? h+"h " : "") + String(m).padStart(2,"0")+"m " + String(s).padStart(2,"0")+"s";
+}
+function fmtDurLonga(seg){
+  seg = +seg;
+  if (!seg) return "0h";
+  const h = Math.floor(seg/3600), m = Math.round(seg%3600/60);
+  return h + "h" + String(m).padStart(2,"0");
+}
+function fmtBytes(b){
+  b = +b;
+  if (!b) return "—";
+  if (b > 1e9) return (b/1e9).toLocaleString("pt-BR",{maximumFractionDigits:2}) + " GB";
+  return Math.round(b/1e6).toLocaleString("pt-BR") + " MB";
+}
+function dataArquivo(){ return new Date().toLocaleDateString("sv"); } // AAAA-MM-DD local (não UTC)
+function anoDe(l){ return (l.video_criado_em || "").slice(0,4) || "s/ data"; }
+function anoGravDe(l){ return (l.gravacao_data || "").slice(0,4) || "s/ dado"; }
+function ehVideo(l){ return !!l.bloco_id; }
+function soDigitos(s, minimo){
+  const n = String(s || "").replace(/\D/g, "");
+  return (n.length >= minimo && n.length <= 8) ? n : "";
+}
+function idAntigo(l){
+  if (l.video_id_antigo) return l.video_id_antigo;
+  let m = /videosintra\s*([\d.,]{3,12})/i.exec(l.video_nome_original || "");
+  if (m){ const n = soDigitos(m[1], 3); if (n) return n; }
+  m = /[-–—]\s*([\d.,]{4,9})\s*$/.exec((l.video_nome || "").trim());
+  return m ? soDigitos(m[1], 4) : "";
+}
+
+/* ====================== carga dos dados ======================== */
+async function carregarExtracoes(selecionar){
+  const r = await fetch("/api/extracoes");
+  const lista = await r.json();
+  const sel = $("selDataset");
+  sel.innerHTML = lista.length
+    ? lista.map(i => `<option value="${esc(i.arquivo)}">${esc(i.termo)} — ${i.data.split("-").reverse().join("/")}</option>`).join("")
+    : `<option value="">(nenhuma extração ainda)</option>`;
+  if (selecionar) sel.value = selecionar;
+  await carregarDados();
+}
+async function carregarDados(){
+  const arq = $("selDataset").value;
+  if (!arq){
+    LINHAS = [];
+    $("arvore").innerHTML = `<div class="vazio">Nenhuma extração encontrada.<br>
+      Clique em <b>🔄 Nova extração</b> para gerar a primeira.</div>`;
+    montarFiltros(); aplicarFiltros();
+    return;
+  }
+  $("arvore").innerHTML = `<div class="vazio">Carregando dados...</div>`;
+  const r = await fetch("/api/dados?arquivo=" + encodeURIComponent(arq));
+  LINHAS = await r.json();
+  abertos = new Set(); selecionado = null; fecharDetalhe();
+  excluidos = new Map(); atualizarCampoExcluidos();
+  montarFiltros();
+  aplicarFiltros();
+}
+
+/* ========================= filtros ============================= */
+function montarFiltros(){
+  // anos (mais recentes primeiro; "s/ data"/"s/ dado" por último)
+  const ordAnos = (a,b) => {
+    if (a.startsWith("s/")) return 1;
+    if (b.startsWith("s/")) return -1;
+    return b.localeCompare(a);
+  };
+  const anos = [...new Set(LINHAS.filter(ehVideo).map(anoDe))].sort(ordAnos);
+  anosAtivos = new Set();
+  $("fAnos").innerHTML = anos.map(a =>
+    `<button class="chip" data-ano="${esc(a)}" onclick="toggleAno('${esc(a)}')">${esc(a)}</button>`).join("") || "<span class='ajuda'>—</span>";
+  const anosGrav = [...new Set(LINHAS.filter(ehVideo).map(anoGravDe))].sort(ordAnos);
+  anosGravAtivos = new Set();
+  $("fAnosGrav").innerHTML = anosGrav.map(a =>
+    `<button class="chip" data-ano="${esc(a)}" onclick="toggleAnoGrav('${esc(a)}')">${esc(a)}</button>`).join("") || "<span class='ajuda'>—</span>";
+  // cursos (seleção múltipla; vazio = todos)
+  const vistos = new Map();
+  LINHAS.forEach(l => { if (!vistos.has(l.curso_id)) vistos.set(l.curso_id, (l.curso_nome || "").trim()); });
+  CURSOS = [...vistos].map(([id, nome]) => ({id, nome})).sort((a,b) => a.nome.localeCompare(b.nome));
+  cursosAtivos = new Set();
+  $("fCursoBusca").value = "";
+  renderListaCursos();
+  // professores
+  montarListaProf();
+  // tipos ("cast" começa desmarcado: dados não batem, fica fora da análise)
+  const tipos = [...new Set(LINHAS.filter(ehVideo).map(l => l.bloco_tipo))].sort();
+  $("fTipos").innerHTML = tipos.map(t =>
+    `<label><input type="checkbox" value="${esc(t)}" ${t === "cast" ? "" : "checked"}
+      onchange="aplicarFiltros()"> ${esc(t)}${t === "cast" ? " <span class='ajuda' style='margin:0'>(fora da análise)</span>" : ""}</label>`).join("");
+}
+function renderListaCursos(){
+  const busca = ($("fCursoBusca").value || "").toLowerCase();
+  const visiveis = CURSOS.filter(c => !excluidos.has(c.id)); // removidos ficam fora
+  $("fCursos").innerHTML = visiveis
+    .filter(c => !busca || c.nome.toLowerCase().includes(busca))
+    .map(c => `<label title="${esc(c.nome)}"><input type="checkbox" value="${esc(c.id)}"
+        ${cursosAtivos.has(c.id) ? "checked" : ""} onchange="toggleCurso(this)">
+        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${esc(c.nome)}</span></label>`)
+    .join("") || "<span class='ajuda'>—</span>";
+  $("nCursosSel").textContent = cursosAtivos.size
+    ? `${cursosAtivos.size} de ${visiveis.length}` : "todos";
+}
+function toggleCurso(chk){
+  chk.checked ? cursosAtivos.add(chk.value) : cursosAtivos.delete(chk.value);
+  $("nCursosSel").textContent = cursosAtivos.size
+    ? `${cursosAtivos.size} de ${CURSOS.filter(c => !excluidos.has(c.id)).length}` : "todos";
+  aplicarFiltros();
+}
+function selecionarCursos(){
+  cursosAtivos = new Set();
+  renderListaCursos();
+  aplicarFiltros();
+}
+let PROFS = [];
+const RX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function profsDe(l){
+  // usa o campo professores; se vier vazio/UUID, extrai do final do nome do curso
+  const lista = (l.professores || "").split("|").map(p => p.trim())
+    .filter(p => p && !RX_UUID.test(p));
+  if (lista.length) return lista;
+  const m = /[-–]\s*((?:Profs?|Prfs?|Prfo|Prof[ª°]?|Equipe)\.?[^-–]*)$/i.exec(l.curso_nome || "");
+  return m ? [m[1].trim()] : [];
+}
+function montarListaProf(){
+  const set = new Set();
+  LINHAS.forEach(l => profsDe(l).forEach(p => set.add(p)));
+  PROFS = [...set].sort((a,b) => a.localeCompare(b));
+  renderListaProf();
+}
+function renderListaProf(){
+  const marcados = new Set([...document.querySelectorAll("#fProfs input:checked")].map(i => i.value));
+  const busca = ($("fProfBusca").value || "").toLowerCase();
+  $("fProfs").innerHTML = PROFS
+    .filter(p => !busca || p.toLowerCase().includes(busca))
+    .map(p => `<label><input type="checkbox" value="${esc(p)}" ${marcados.has(p) ? "checked" : ""}
+               onchange="aplicarFiltros()"> ${esc(p)}</label>`).join("") || "<span class='ajuda'>—</span>";
+}
+function toggleAno(a){
+  anosAtivos.has(a) ? anosAtivos.delete(a) : anosAtivos.add(a);
+  document.querySelectorAll("#fAnos .chip").forEach(c =>
+    c.classList.toggle("ativo", anosAtivos.has(c.dataset.ano)));
+  aplicarFiltros();
+}
+function toggleAnoGrav(a){
+  anosGravAtivos.has(a) ? anosGravAtivos.delete(a) : anosGravAtivos.add(a);
+  document.querySelectorAll("#fAnosGrav .chip").forEach(c =>
+    c.classList.toggle("ativo", anosGravAtivos.has(c.dataset.ano)));
+  aplicarFiltros();
+}
+function limparFiltros(){
+  cursosAtivos = new Set(); $("fCursoBusca").value = ""; renderListaCursos();
+  $("fBusca").value = ""; $("fProfBusca").value = "";
+  $("fPublicado").value = ""; $("fRascunho").value = ""; $("fIdAntigo").value = "";
+  $("fDepara").value = "";
+  $("fDurMin").value = ""; $("fDurMax").value = ""; $("fSoErros").checked = false;
+  anosAtivos = new Set(); anosGravAtivos = new Set();
+  document.querySelectorAll("#fAnos .chip, #fAnosGrav .chip").forEach(c => c.classList.remove("ativo"));
+  document.querySelectorAll("#fProfs input").forEach(i => i.checked = false);
+  document.querySelectorAll("#fTipos input").forEach(i => i.checked = i.value !== "cast");
+  aplicarFiltros();
+}
+function aplicarFiltrosDebounce(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(aplicarFiltros, 250);
+}
+function aplicarFiltros(){
+  const busca = ($("fBusca").value || "").toLowerCase().trim();
+  const profs = new Set([...document.querySelectorAll("#fProfs input:checked")].map(i => i.value));
+  const tipos = new Set([...document.querySelectorAll("#fTipos input:checked")].map(i => i.value));
+  const pub = $("fPublicado").value, ras = $("fRascunho").value;
+  const dMin = parseFloat($("fDurMin").value) * 60 || 0;
+  const dMax = parseFloat($("fDurMax").value) * 60 || Infinity;
+  const soErros = $("fSoErros").checked;
+  const fIdAnt = $("fIdAntigo").value;
+  const fDep = $("fDepara").value;
+
+  FILTRADAS = LINHAS.filter(l => {
+    if (excluidos.has(l.curso_id)) return false;
+    if (cursosAtivos.size && !cursosAtivos.has(l.curso_id)) return false;
+    if (soErros && !l.erro) return false;
+    if (pub && l.curso_publicado !== pub) return false;
+    if (ehVideo(l)){
+      if (!tipos.has(l.bloco_tipo)) return false;
+      if (ras && l.bloco_rascunho !== ras) return false;
+      if (anosAtivos.size && !anosAtivos.has(anoDe(l))) return false;
+      if (anosGravAtivos.size && !anosGravAtivos.has(anoGravDe(l))) return false;
+      if (fIdAnt === "com" && !idAntigo(l)) return false;
+      if (fIdAnt === "sem" && idAntigo(l)) return false;
+      if (fDep === "sim" && l.depara_ok !== "sim") return false;
+      if (fDep === "nao" && l.depara_ok === "sim") return false;
+      if (fDep === "diverge" && l.depara_confere !== "nao") return false;
+      const seg = +l.video_duracao_seg || 0;
+      if (dMin && seg < dMin) return false;
+      if (dMax !== Infinity && seg > dMax) return false;
+    } else {
+      // linha de erro/pendência: só passa nos filtros de vídeo se eles estiverem neutros
+      if (anosAtivos.size || anosGravAtivos.size || dMin || dMax !== Infinity || fIdAnt || fDep) return false;
+      if (ras === "sim") return false;
+    }
+    if (profs.size){
+      if (!profsDe(l).some(p => profs.has(p))) return false;
+    }
+    if (busca){
+      const alvo = [l.curso_nome, l.capitulo_nome, l.aula_nome, l.video_nome,
+                    l.video_nome_original, l.video_intra_id, l.video_id,
+                    idAntigo(l), l.professores, l.mb_titulo, l.mb_raiz,
+                    l.mb_arvore_path].join(" ").toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+  renderTudo();
+}
+
+/* ==================== KPIs e gráficos ========================== */
+function renderTudo(){
+  const vids = FILTRADAS.filter(ehVideo);
+  $("contFiltro").textContent = `${vids.length} vídeo(s)`;
+
+  const cursos = new Set(FILTRADAS.map(l => l.curso_id));
+  const aulas = new Set(FILTRADAS.map(l => l.curso_id + "/" + l.item_id));
+  const durTotal = vids.reduce((s,l) => s + (+l.video_duracao_seg || 0), 0);
+  const bytes = vids.reduce((s,l) => s + (+l.video_tamanho_bytes || 0), 0);
+  const nErros = FILTRADAS.filter(l => l.erro).length;
+  const unicos = new Set(vids.map(l => l.video_id)).size;
+  const semIdAntigo = vids.filter(l => !idAntigo(l)).length;
+  const comDataReal = vids.filter(l => l.depara_ok === "sim").length;
+  const pctReal = vids.length ? Math.round(comDataReal / vids.length * 100) : 0;
+
+  $("kpis").innerHTML = `
+    <div class="kpi"><div class="num">${cursos.size}</div><div class="rot">cursos</div></div>
+    <div class="kpi"><div class="num">${aulas.size}</div><div class="rot">aulas com vídeo</div></div>
+    <div class="kpi"><div class="num">${vids.length}</div><div class="rot">vídeos (ocorrências)</div></div>
+    <div class="kpi"><div class="num">${unicos}</div><div class="rot">vídeos únicos</div></div>
+    <div class="kpi"><div class="num">${fmtDurLonga(durTotal)}</div><div class="rot">duração total</div></div>
+    <div class="kpi"><div class="num">${fmtBytes(bytes)}</div><div class="rot">tamanho total</div></div>
+    <div class="kpi"><div class="num" style="color:var(--verde)">${pctReal}%</div>
+      <div class="rot">com data real (${comDataReal})</div></div>
+    <div class="kpi"><div class="num" style="color:${semIdAntigo ? "var(--amarelo)" : "inherit"}">${semIdAntigo}</div>
+      <div class="rot">sem ID antigo (de→para)</div></div>
+    <div class="kpi"><div class="num" style="color:${nErros ? "var(--vermelho)" : "inherit"}">${nErros}</div>
+      <div class="rot">erros/pendências</div></div>`;
+
+  // gráficos: vídeos por ano (gravação real e entrada no acervo)
+  function grafAno(destino, fnAno, fnToggle){
+    const por = {};
+    vids.forEach(l => { const a = fnAno(l); por[a] = (por[a] || 0) + 1; });
+    const chaves = Object.keys(por).sort((a,b) => {
+      if (a.startsWith("s/")) return 1;
+      if (b.startsWith("s/")) return -1;
+      return a.localeCompare(b);
+    });
+    const max = Math.max(1, ...Object.values(por));
+    $(destino).innerHTML = chaves.map(a => `
+      <div class="barra-linha">
+        <div class="rotulo">${esc(a)}</div>
+        <div class="barra-trilho" onclick="${fnToggle}('${esc(a)}')" title="clique p/ filtrar ${esc(a)}">
+          <div class="barra" style="width:${por[a]/max*100}%"></div></div>
+        <div class="valor">${por[a]}</div>
+      </div>`).join("") || "<span class='ajuda'>sem dados</span>";
+  }
+  grafAno("grafAnosGrav", anoGravDe, "toggleAnoGrav");
+  grafAno("grafAnos", anoDe, "toggleAno");
+
+  // gráfico: top cursos por duração
+  const porCurso = {};
+  vids.forEach(l => { porCurso[l.curso_nome] = (porCurso[l.curso_nome] || 0) + (+l.video_duracao_seg || 0); });
+  const top = Object.entries(porCurso).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const maxCur = Math.max(1, ...top.map(t => t[1]));
+  $("grafCursos").innerHTML = top.map(([nome,seg]) => `
+    <div class="barra-linha">
+      <div class="rotulo largo" title="${esc(nome)}">${esc(nome)}</div>
+      <div class="barra-trilho"><div class="barra" style="width:${seg/maxCur*100}%"></div></div>
+      <div class="valor">${fmtDurLonga(seg)}</div>
+    </div>`).join("") || "<span class='ajuda'>sem dados</span>";
+
+  renderArvore();
+}
+
+/* ========================= árvore ============================== */
+function renderArvore(){
+  if (!FILTRADAS.length){
+    $("arvore").innerHTML = `<div class="vazio">Nada encontrado com os filtros atuais.</div>`;
+    return;
+  }
+  // agrupa preservando a ordem das linhas (já vêm ordenadas)
+  const cursos = new Map();
+  for (const l of FILTRADAS){
+    if (!cursos.has(l.curso_id))
+      cursos.set(l.curso_id, {info:l, caps:new Map(), n:0, dur:0});
+    const c = cursos.get(l.curso_id);
+    const capKey = l.capitulo_id + "|" + l.capitulo_nome;
+    if (!c.caps.has(capKey)) c.caps.set(capKey, {info:l, aulas:new Map(), n:0, dur:0});
+    const cap = c.caps.get(capKey);
+    if (!cap.aulas.has(l.item_id)) cap.aulas.set(l.item_id, {info:l, vids:[]});
+    cap.aulas.get(l.item_id).vids.push(l);
+    if (ehVideo(l)){
+      c.n++; cap.n++;
+      c.dur += +l.video_duracao_seg || 0;
+      cap.dur += +l.video_duracao_seg || 0;
+    }
+  }
+  let html = "";
+  for (const [cid, c] of cursos){
+    const abertoC = abertos.has(cid) ? "aberto" : "";
+    html += `<div class="no no-curso ${abertoC}" id="no-${cid}">
+      <div class="no-cab" onclick="toggleNo('${cid}')">
+        <span class="seta">▶</span>
+        <a class="btn-ldi" href="https://admin.estrategia.com/#/concursos/ecommerce/produtos/${esc(cid)}"
+           target="_blank" rel="noopener"
+           title="Abrir este curso no LDI Admin ↗ (o link também é copiado — se abrir na raiz, cole na barra de endereço)"
+           onclick="event.stopPropagation(); copiarLinkLdi(this.href)">↗</a>
+        <span class="no-nome" title="${esc(c.info.curso_nome)}">${esc(c.info.curso_nome)}</span>
+        ${c.info.curso_publicado === "nao" ? '<span class="badge cinza">não publicado</span>' : ""}
+        <span class="badge roxo">${c.n} vídeos</span>
+        <span class="badge">${fmtDurLonga(c.dur)}</span>
+        <span class="meta">${fmtData(c.info.curso_criado_em)}</span>
+        <button class="btn-x" title="Remover este curso da análise"
+                onclick="event.stopPropagation(); removerCurso('${cid}')">✕</button>
+      </div>
+      <div class="no-filhos">`;
+    for (const [ck, cap] of c.caps){
+      const idCap = cid + "::" + ck;
+      const abertoCap = abertos.has(idCap) ? "aberto" : "";
+      const iCap = LINHAS.indexOf(cap.info);
+      html += `<div class="no no-cap ${abertoCap}">
+        <div class="no-cab" onclick="toggleNo('${esc(idCap).replace(/'/g,"\\'")}')">
+          <span class="seta">▶</span>
+          <span class="no-nome" title="${esc(cap.info.capitulo_nome)}">
+            ${cap.info.capitulo_ordem ? cap.info.capitulo_ordem + ". " : ""}${esc(cap.info.capitulo_nome) || "(capítulo sem nome)"}</span>
+          ${badgeProp("capitulo", cap.info)}
+          <span class="badge roxo">${cap.n}</span>
+          <span class="badge">${fmtDurLonga(cap.dur)}</span>
+          ${inlineProp("capitulo", iCap, cap.info)}
+          ${btnProp("capitulo", iCap)}
+        </div>
+        <div class="no-filhos">`;
+      for (const [iid, aula] of cap.aulas){
+        const idAula = idCap + "::" + iid;
+        const abertoA = abertos.has(idAula) ? "aberto" : "";
+        const iAula = LINHAS.indexOf(aula.info);
+        html += `<div class="no no-aula ${abertoA}">
+          <div class="no-cab" onclick="toggleNo('${esc(idAula).replace(/'/g,"\\'")}')">
+            <span class="seta">▶</span>
+            <span class="no-nome">${esc(aula.info.aula_path)} — ${esc(aula.info.aula_nome)}</span>
+            ${badgeProp("aula", aula.info)}
+            <span class="badge roxo">${aula.vids.filter(ehVideo).length}</span>
+            ${inlineProp("aula", iAula, aula.info)}
+            ${btnProp("aula", iAula)}
+          </div>
+          <div class="no-filhos">`;
+        for (const v of aula.vids){
+          const i = LINHAS.indexOf(v);
+          if (!ehVideo(v)){
+            html += `<div class="lin-video" onclick="abrirDetalhe(${i})">
+              <span class="vnome" style="color:var(--vermelho)">⚠ ${esc(v.erro)}</span></div>`;
+            continue;
+          }
+          const selCls = selecionado === v ? "selecionado" : "";
+          html += `<div class="lin-video ${selCls}" onclick="abrirDetalhe(${i})">
+            <span>▶</span>
+            <span class="vnome" title="${esc(v.video_nome)}">${esc(v.video_nome) || "(sem nome)"}</span>
+            ${v.bloco_tipo === "cast" ? '<span class="badge ambar">cast</span>' : ""}
+            ${v.bloco_tipo === "youtube" ? '<span class="badge verm">youtube</span>' : ""}
+            ${v.bloco_rascunho === "sim" ? '<span class="badge cinza">rascunho</span>' : ""}
+            ${idAntigo(v) ? `<span class="badge azul">antigo ${esc(idAntigo(v))}</span>`
+                          : '<span class="badge ambar">sem ID antigo</span>'}
+            ${v.depara_ok === "sim" ? `<span class="badge verde-claro" style="background:#DCFCE7;color:#166534">🎥 ${esc(v.gravacao_ano)}</span>`
+              : (idAntigo(v) ? '<span class="badge cinza">não casou</span>' : "")}
+            ${badgeProp("video", v)}
+            <span class="meta">${fmtDur(v.video_duracao_seg)}</span>
+            <span class="meta">${anoDe(v)}</span>
+            ${inlineProp("video", i, v)}
+            ${btnProp("video", i)}
+          </div>`;
+        }
+        html += `</div></div>`;
+      }
+      html += `</div></div>`;
+    }
+    html += `</div></div>`;
+  }
+  $("arvore").innerHTML = html;
+}
+function toggleNo(id){
+  abertos.has(id) ? abertos.delete(id) : abertos.add(id);
+  renderArvore();
+}
+function copiarLinkLdi(url){
+  // o admin é SPA: no redirecionamento de login o trecho após o # se perde e a
+  // página cai na raiz — por isso o link também vai para a área de transferência
+  navigator.clipboard.writeText(url).then(() =>
+    toast("Abrindo no LDI Admin… Link copiado — se abrir na raiz (#/), cole na barra de endereço e dê Enter."),
+    () => {});
+}
+function expandirTudo(abrir){
+  abertos = new Set();
+  if (abrir){
+    for (const l of FILTRADAS){
+      const capKey = l.capitulo_id + "|" + l.capitulo_nome;
+      abertos.add(l.curso_id);
+      abertos.add(l.curso_id + "::" + capKey);
+      abertos.add(l.curso_id + "::" + capKey + "::" + l.item_id);
+    }
+  }
+  renderArvore();
+}
+
+/* ======================== detalhes ============================= */
+function copiar(texto){
+  navigator.clipboard.writeText(texto).then(() => toast("Copiado!"));
+}
+function detLinha(rotulo, valor, copiavel){
+  const v = valor === "" || valor == null ? "—" : valor;
+  return `<div class="det-linha"><div class="k">${rotulo}</div>
+    <div class="v">${esc(v)}${copiavel && v !== "—"
+      ? ` <button class="copiar" onclick="copiar('${esc(String(v)).replace(/'/g,"\\'")}')">copiar</button>` : ""}</div></div>`;
+}
+function abrirDetalhe(i){
+  const l = LINHAS[i];
+  selecionado = l;
+  $("app").classList.add("com-detalhe");
+  const p = $("painelDetalhe");
+  p.style.display = "block";
+  p.innerHTML = `
+    <button class="fechar-det" onclick="fecharDetalhe()">✕</button>
+    <h2>${esc(l.video_nome || l.aula_nome || "Detalhes")}</h2>
+    <div class="sub">${esc(l.curso_nome)}</div>
+    ${l.erro ? `<div class="status-caixa" style="border-color:var(--vermelho); color:var(--vermelho)">⚠ ${esc(l.erro)}</div>` : ""}
+    <div class="det-grupo"><h4>Vídeo</h4>
+      ${detLinha("ID sistema antigo", idAntigo(l), true)}
+      ${detLinha("ID (novo/UUID)", l.video_id, true)}
+      ${detLinha("ID intra (INT)", l.video_intra_id, true)}
+      ${detLinha("Nome original", l.video_nome_original, true)}
+      ${detLinha("Duração", l.video_duracao ? l.video_duracao + " (" + fmtDur(l.video_duracao_seg) + ")" : "")}
+      ${detLinha("Entrou no acervo em", fmtData(l.video_criado_em, true))}
+      ${detLinha("Tamanho", fmtBytes(l.video_tamanho_bytes))}
+      ${l.video_url ? `<div class="det-linha"><div class="k">Arquivo</div>
+        <div class="v"><a href="${esc(l.video_url)}" target="_blank">abrir vídeo ↗</a></div></div>` : ""}
+    </div>
+    <div class="det-grupo"><h4>Sistema antigo (de→para Metabase)</h4>
+      ${l.depara_ok === "sim" ? `
+        ${l.depara_confere === "nao" ? `<div class="status-caixa" style="border-color:var(--amarelo); color:var(--amarelo); padding:8px">
+          ⚠ A duração no LDI (${fmtDur(l.video_duracao_seg)}) diverge da do sistema antigo (${esc(l.mb_duracao)}) — confira se o ID casou o vídeo certo.</div>` : ""}
+        ${detLinha("🎥 Gravado em", fmtData(l.gravacao_data, true) + (l.gravacao_ano ? " (" + l.gravacao_ano + ")" : ""))}
+        ${detLinha("Título antigo", l.mb_titulo)}
+        ${detLinha("Status antigo", l.mb_status)}
+        ${l.mb_duracao ? detLinha("Duração (antigo)", l.mb_duracao +
+            (l.depara_confere === "sim" ? " ✔ bate" : l.depara_confere === "nao" ? " ⚠ diverge" : "")) : ""}
+        ${detLinha("Raiz (árvore antiga)", l.mb_raiz)}
+        ${detLinha("Caminho na árvore", l.mb_arvore_path)}
+        ${detLinha("Aparece em", l.mb_qtd_locais + " local(is) da árvore antiga")}`
+      : `<div class="det-linha"><div class="v" style="color:var(--texto2)">
+          ${idAntigo(l) ? "ID antigo " + esc(idAntigo(l)) + " não encontrado no Metabase (vídeo pode ter sido excluído do sistema antigo, ou o número no nome não é um ID)."
+                        : "Sem ID antigo no nome — não há como casar com o sistema antigo."}</div></div>`}
+    </div>
+    <div class="det-grupo"><h4>Bloco no material</h4>
+      ${detLinha("Tipo", l.bloco_tipo)}
+      ${detLinha("Rascunho", l.bloco_rascunho)}
+      ${detLinha("Inserido em", fmtData(l.bloco_criado_em, true))}
+      ${detLinha("Atualizado em", fmtData(l.bloco_atualizado_em, true))}
+      ${detLinha("ID do bloco", l.bloco_id, true)}
+    </div>
+    <div class="det-grupo"><h4>Localização</h4>
+      ${detLinha("Curso", l.curso_nome)}
+      ${detLinha("Publicado", l.curso_publicado)}
+      ${detLinha("Capítulo", (l.capitulo_ordem ? l.capitulo_ordem + ". " : "") + (l.capitulo_nome || ""))}
+      ${detLinha("Versão do capítulo", l.capitulo_versao)}
+      ${detLinha("Aula", l.aula_path + " — " + l.aula_nome)}
+      ${detLinha("Professores", profsDe(l).join(" | "))}
+      ${detLinha("ID do curso", l.curso_id, true)}
+      ${detLinha("ID do item/aula", l.item_id, true)}
+    </div>`;
+  renderArvore();
+}
+function fecharDetalhe(){
+  selecionado = null;
+  $("app").classList.remove("com-detalhe");
+  $("painelDetalhe").style.display = "none";
+}
+
+/* ================ remover / restaurar cursos =================== */
+function removerCurso(cid){
+  const l = LINHAS.find(x => x.curso_id === cid);
+  excluidos.set(cid, l ? l.curso_nome : cid);
+  cursosAtivos.delete(cid);  // sai também da seleção do filtro de cursos
+  atualizarCampoExcluidos();
+  aplicarFiltros();
+  toast("Curso removido da análise. Use 🚫 nos filtros para restaurar.");
+}
+function restaurarCurso(cid){
+  excluidos.delete(cid);
+  atualizarCampoExcluidos();
+  aplicarFiltros();
+}
+function restaurarTodos(){
+  excluidos = new Map();
+  atualizarCampoExcluidos();
+  aplicarFiltros();
+}
+function atualizarCampoExcluidos(){
+  const campo = $("campoExcluidos");
+  $("nExcluidos").textContent = excluidos.size;
+  campo.style.display = excluidos.size ? "block" : "none";
+  $("listaExcluidos").innerHTML = [...excluidos].map(([id, nome]) => `
+    <div class="exc-item">
+      <span class="nm" title="${esc(nome)}">${esc(nome)}</span>
+      <button class="copiar" onclick="restaurarCurso('${id}')">restaurar</button>
+    </div>`).join("");
+  renderListaCursos(); // filtro de cursos acompanha remoções/restaurações
+}
+
+/* =================== análises salvas =========================== */
+function coletarEstado(){
+  return {
+    dataset: $("selDataset").value,
+    busca: $("fBusca").value,
+    anos: [...anosAtivos],
+    anosGrav: [...anosGravAtivos],
+    depara: $("fDepara").value,
+    profs: [...document.querySelectorAll("#fProfs input:checked")].map(i => i.value),
+    tipos: [...document.querySelectorAll("#fTipos input:checked")].map(i => i.value),
+    publicado: $("fPublicado").value,
+    rascunho: $("fRascunho").value,
+    idAntigo: $("fIdAntigo").value,
+    durMin: $("fDurMin").value,
+    durMax: $("fDurMax").value,
+    soErros: $("fSoErros").checked,
+    cursos: [...cursosAtivos],
+    excluidos: [...excluidos].map(([id, nome]) => ({id, nome})),
+  };
+}
+function aplicarEstado(e){
+  $("fBusca").value = e.busca || "";
+  $("fPublicado").value = e.publicado || "";
+  $("fRascunho").value = e.rascunho || "";
+  $("fIdAntigo").value = e.idAntigo || "";
+  $("fDurMin").value = e.durMin || "";
+  $("fDurMax").value = e.durMax || "";
+  $("fSoErros").checked = !!e.soErros;
+  $("fDepara").value = e.depara || "";
+  anosAtivos = new Set(e.anos || []);
+  document.querySelectorAll("#fAnos .chip").forEach(c =>
+    c.classList.toggle("ativo", anosAtivos.has(c.dataset.ano)));
+  anosGravAtivos = new Set(e.anosGrav || []);
+  document.querySelectorAll("#fAnosGrav .chip").forEach(c =>
+    c.classList.toggle("ativo", anosGravAtivos.has(c.dataset.ano)));
+  const profs = new Set(e.profs || []);
+  document.querySelectorAll("#fProfs input").forEach(i => i.checked = profs.has(i.value));
+  if (Array.isArray(e.tipos) && e.tipos.length){
+    const tipos = new Set(e.tipos);
+    document.querySelectorAll("#fTipos input").forEach(i => i.checked = tipos.has(i.value));
+  }
+  cursosAtivos = new Set(e.cursos || []);
+  renderListaCursos();
+  excluidos = new Map((e.excluidos || []).map(o => [o.id, o.nome]));
+  atualizarCampoExcluidos();
+  aplicarFiltros();
+}
+async function carregarListaAnalises(){
+  ANALISES = await (await fetch("/api/analises")).json();
+  const sel = $("selAnalise");
+  sel.innerHTML = `<option value="">📌 Análises…</option>` +
+    ANALISES.map(a => `<option value="${esc(a.nome)}">${esc(a.nome)}</option>`).join("");
+  if (analiseAtual) sel.value = analiseAtual;
+}
+async function salvarAnalise(){
+  const nome = $("nomeAnalise").value.trim();
+  if (!nome) return toast("Dê um nome para a análise.");
+  const r = await fetch("/api/analises", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({nome, estado: coletarEstado()})});
+  if (!r.ok){ const e = await r.json(); return toast(e.erro || "Erro ao salvar."); }
+  analiseAtual = nome;
+  await carregarListaAnalises();
+  renderListaAnalises();
+  toast(`Análise "${nome}" salva! ✔`);
+}
+async function carregarAnalise(nome){
+  if (!nome) return;
+  if (!ANALISES.length) await carregarListaAnalises();
+  const a = ANALISES.find(x => x.nome === nome);
+  if (!a) return toast("Análise não encontrada.");
+  const e = a.estado || {};
+  const sel = $("selDataset");
+  if (e.dataset && sel.value !== e.dataset){
+    if ([...sel.options].some(o => o.value === e.dataset)){
+      sel.value = e.dataset;
+      await carregarDados();
+    } else {
+      toast("A extração original desta análise não existe mais — aplicando à atual.");
+    }
+  }
+  aplicarEstado(e);
+  analiseAtual = nome;
+  $("selAnalise").value = nome;
+  fecharModais();
+  toast(`Análise "${nome}" carregada.`);
+}
+async function excluirAnalise(nome){
+  await fetch("/api/analises/excluir", {method:"POST",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify({nome})});
+  if (analiseAtual === nome) analiseAtual = "";
+  await carregarListaAnalises();
+  renderListaAnalises();
+  toast(`Análise "${nome}" excluída.`);
+}
+function renderListaAnalises(){
+  $("listaAnalises").innerHTML = ANALISES.length ? ANALISES.map((a, i) => `
+    <div class="analise-item">
+      <span class="nm"><b>${esc(a.nome)}</b>
+        <span class="dt"> · salva em ${esc(a.salva_em || "")}
+        ${a.estado && a.estado.excluidos && a.estado.excluidos.length
+          ? " · " + a.estado.excluidos.length + " curso(s) removido(s)" : ""}</span></span>
+      <button class="btn" onclick="carregarAnalise(ANALISES[${i}].nome)">Carregar</button>
+      <button class="btn" onclick="excluirAnalise(ANALISES[${i}].nome)">🗑</button>
+    </div>`).join("")
+    : `<p class="ajuda">Nenhuma análise salva ainda.</p>`;
+}
+function abrirModalAnalise(){
+  $("nomeAnalise").value = analiseAtual;
+  renderListaAnalises();
+  $("modalAnalise").classList.add("aberto");
+}
+
+/* ============== propostas de substituição de vídeos ============ */
+let PROPOSTAS = [];          // todas as propostas (do servidor)
+let PROP_IDX = new Map();    // chave do alvo -> proposta
+let propostaCtx = null;      // contexto do modal aberto {nivel, linha, chave, id, base}
+const NIVEL_ROT = {capitulo: "Tópico/Capítulo", aula: "Aula", video: "Vídeo específico"};
+const STATUS_ROT = {proposta: "🟡 Proposta", enviada: "🔵 Enviada", atendida: "🟢 Atendida"};
+
+function chaveProp(nivel, l){
+  return nivel === "capitulo" ? l.curso_id + "::" + l.capitulo_id
+       : nivel === "aula"     ? l.curso_id + "::" + l.item_id
+       : String(l.bloco_id);
+}
+function reindexarPropostas(){
+  PROP_IDX = new Map(PROPOSTAS.map(p => [p.chave, p]));
+  $("btnPropostas").textContent = PROPOSTAS.length
+    ? `📋 Propostas (${PROPOSTAS.length})` : "📋 Propostas";
+}
+async function carregarPropostas(){
+  try{ PROPOSTAS = await (await fetch("/api/propostas")).json(); }
+  catch(e){ PROPOSTAS = []; }
+  reindexarPropostas();
+}
+function badgeProp(nivel, l){
+  const p = PROP_IDX.get(chaveProp(nivel, l));
+  if (!p) return "";
+  const n = (p.propostos || []).length;
+  return `<span class="badge verde" title="${esc(p.observacao || "proposta de substituição")}">💡 ${n} proposto(s)</span>`;
+}
+function btnProp(nivel, i){
+  if (i < 0) return "";
+  return `<button class="btn-prop" title="Propor substituição de vídeos"
+          onclick="event.stopPropagation(); abrirModalProposta('${nivel}', ${i})">📝</button>`;
+}
+function videosAtuaisDe(nivel, l){
+  let rows;
+  if (nivel === "capitulo")
+    rows = LINHAS.filter(x => x.curso_id === l.curso_id && x.capitulo_id === l.capitulo_id);
+  else if (nivel === "aula")
+    rows = LINHAS.filter(x => x.curso_id === l.curso_id && x.item_id === l.item_id);
+  else rows = [l];
+  // respeita o filtro de tipos (ex.: "cast" desmarcado fica fora da proposta também)
+  const tiposAtivos = new Set([...document.querySelectorAll("#fTipos input:checked")].map(i => i.value));
+  return rows.filter(ehVideo)
+    .filter(v => !tiposAtivos.size || tiposAtivos.has(v.bloco_tipo)).map(v => ({
+    nome: v.video_nome || "(sem nome)",
+    id: idAntigo(v) || "",
+    dur: fmtDur(v.video_duracao_seg),
+    ano_grav: v.gravacao_ano || "",
+  }));
+}
+
+function abrirModalProposta(nivel, i, base){
+  const l = i >= 0 ? LINHAS[i] : null;
+  const chave = l ? chaveProp(nivel, l) : base.chave;
+  const p = base || PROP_IDX.get(chave) || null;
+  propostaCtx = {nivel, linha: l, chave, id: p ? p.id : "", base: p};
+
+  const capitulo = l ? (l.capitulo_ordem ? l.capitulo_ordem + ". " : "") + (l.capitulo_nome || "")
+                     : (p.capitulo || "");
+  const aula = l ? (nivel !== "capitulo" ? l.aula_path + " — " + l.aula_nome : "")
+                 : (p.aula || "");
+  const alvoNome = nivel === "capitulo" ? capitulo
+                 : nivel === "aula" ? aula
+                 : (l ? l.video_nome : p.video_atual);
+  $("propAlvo").innerHTML = `
+    <div class="lin"><span>Nível</span><b>${esc(NIVEL_ROT[nivel] || nivel)}</b></div>
+    <div class="lin"><span>Alvo</span><b style="text-align:right">${esc(alvoNome)}</b></div>
+    <div class="lin"><span>Curso</span><span style="text-align:right">${esc((l ? l.curso_nome : p.curso_nome) || "").trim()}</span></div>
+    ${nivel !== "capitulo" && capitulo ? `<div class="lin"><span>Capítulo</span><span style="text-align:right">${esc(capitulo)}</span></div>` : ""}
+    ${nivel === "video" && aula ? `<div class="lin"><span>Aula</span><span style="text-align:right">${esc(aula)}</span></div>` : ""}`;
+
+  const atuais = l ? videosAtuaisDe(nivel, l) : (p.videos_atuais || []);
+  $("propNAtuais").textContent = atuais.length;
+  $("propAtuais").innerHTML = atuais.map(v =>
+    `<div title="${esc(v.nome)}">▶ ${esc(v.nome)}
+       <span style="color:var(--texto2)">· ${v.dur || "—"}${v.ano_grav ? " · grav. " + esc(v.ano_grav) : ""}${v.id ? " · ID " + esc(v.id) : ""}</span></div>`).join("")
+    || "<span class='ajuda'>nenhum vídeo atual encontrado</span>";
+
+  $("propLista").innerHTML = "";
+  const props = p ? (p.propostos || []) : [];
+  if (props.length) props.forEach(v => addLinhaProposto(v.nome, v.id));
+  else addLinhaProposto();
+  $("propObs").value = p ? (p.observacao || "") : "";
+  $("propStatus").value = p ? (p.status || "proposta") : "proposta";
+  $("btnExcluirProposta").style.visibility = p && p.id ? "visible" : "hidden";
+  fecharModais();
+  $("modalProposta").classList.add("aberto");
+}
+
+function addLinhaProposto(nome, id){
+  const div = document.createElement("div");
+  div.className = "prop-linha";
+  div.innerHTML = `
+    <input type="text" class="pnome" placeholder="nome do vídeo proposto" value="${esc(nome || "")}">
+    <input type="text" class="pid" placeholder="ID do vídeo" value="${esc(id || "")}">
+    <button class="btn-x" style="opacity:1" title="remover linha"
+            onclick="this.parentElement.remove()">✕</button>`;
+  $("propLista").appendChild(div);
+  if (nome == null) div.querySelector(".pnome").focus();
+}
+
+async function salvarProposta(){
+  const {nivel, linha: l, chave, id, base} = propostaCtx;
+  const propostos = [...$("propLista").querySelectorAll(".prop-linha")].map(r => ({
+    nome: r.querySelector(".pnome").value.trim(),
+    id: r.querySelector(".pid").value.trim(),
+  })).filter(v => v.nome || v.id);
+  const observacao = $("propObs").value.trim();
+  if (!propostos.length && !observacao)
+    return toast("Inclua ao menos um vídeo proposto ou uma observação.");
+  const corpo = l ? {
+    id, nivel, chave,
+    dataset: $("selDataset").value,
+    curso_id: l.curso_id, curso_nome: (l.curso_nome || "").trim(),
+    capitulo: (l.capitulo_ordem ? l.capitulo_ordem + ". " : "") + (l.capitulo_nome || ""),
+    aula: nivel !== "capitulo" ? l.aula_path + " — " + l.aula_nome : "",
+    video_atual: nivel === "video" ? (l.video_nome || "") : "",
+    professores: profsDe(l).join(" | "),
+    videos_atuais: videosAtuaisDe(nivel, l),
+  } : {...base};
+  corpo.id = id; corpo.propostos = propostos; corpo.observacao = observacao;
+  corpo.status = $("propStatus").value;
+  const r = await fetch("/api/propostas", {method: "POST",
+    headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)});
+  if (!r.ok){ const e = await r.json(); return toast(e.erro || "Erro ao salvar."); }
+  await carregarPropostas();
+  fecharModais();
+  renderArvore();
+  toast("Proposta salva! ✔  Veja em 📋 Propostas.");
+}
+
+async function excluirProposta(){
+  if (!propostaCtx || !propostaCtx.id) return fecharModais();
+  if (!confirm("Excluir esta proposta de substituição?")) return;
+  await fetch("/api/propostas/excluir", {method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: propostaCtx.id})});
+  await carregarPropostas();
+  fecharModais();
+  renderArvore();
+  toast("Proposta excluída.");
+}
+
+function abrirModalPropostas(){
+  renderListaPropostas();
+  $("modalPropostas").classList.add("aberto");
+}
+function editarProposta(pid){
+  const p = PROPOSTAS.find(x => x.id === pid);
+  if (!p) return;
+  const i = LINHAS.findIndex(l => chaveProp(p.nivel, l) === p.chave);
+  abrirModalProposta(p.nivel, i, p);
+}
+function renderListaPropostas(){
+  if (!PROPOSTAS.length){
+    $("listaPropostas").innerHTML =
+      "<p class='ajuda'>Nenhuma proposta ainda. Passe o mouse sobre um capítulo, aula ou vídeo na árvore e clique no 📝.</p>";
+    return;
+  }
+  const porCurso = new Map();
+  for (const p of PROPOSTAS){
+    const k = (p.curso_nome || "(curso)").trim();
+    if (!porCurso.has(k)) porCurso.set(k, []);
+    porCurso.get(k).push(p);
+  }
+  let html = "";
+  for (const [curso, lista] of [...porCurso.entries()].sort((a,b) => a[0].localeCompare(b[0]))){
+    html += `<div style="font-weight:600; font-size:13px; margin:10px 0 6px">${esc(curso)}</div>`;
+    for (const p of lista){
+      const alvo = p.nivel === "video" ? p.video_atual : p.nivel === "aula" ? p.aula : p.capitulo;
+      const corSt = p.status === "atendida" ? "verde" : p.status === "enviada" ? "azul" : "ambar";
+      html += `<div class="prop-item">
+        <div style="display:flex; gap:8px; align-items:center">
+          <b class="alvo" style="flex:1; min-width:0">${esc(alvo)}</b>
+          <span class="badge ${corSt}">${STATUS_ROT[p.status] || esc(p.status || "")}</span>
+          <button class="btn" onclick="editarProposta('${esc(p.id)}')">Editar</button>
+        </div>
+        <div class="loc">${esc(NIVEL_ROT[p.nivel] || p.nivel)}${p.nivel !== "capitulo" && p.capitulo ? " · " + esc(p.capitulo) : ""}
+          · ${(p.videos_atuais || []).length} atual(is) → ${(p.propostos || []).length} proposto(s)
+          · atualizada ${esc(p.atualizada_em || "")}</div>
+        ${(p.propostos || []).map(v => `<div>→ <b>${esc(v.nome) || "(sem nome)"}</b>${v.id ? ` <span style="color:var(--texto2)">· ID ${esc(v.id)}</span>` : ""}</div>`).join("")}
+        ${p.observacao ? `<div style="color:var(--texto2); font-style:italic; margin-top:3px">${esc(p.observacao)}</div>` : ""}
+      </div>`;
+    }
+  }
+  $("listaPropostas").innerHTML = html;
+}
+
+/* ------- relatório de divulgação (HTML único, limpo) ------- */
+function gerarRelatorioPropostas(){
+  if (!PROPOSTAS.length) return toast("Nenhuma proposta cadastrada.");
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const porCurso = new Map();
+  for (const p of PROPOSTAS){
+    const k = (p.curso_nome || "(curso)").trim();
+    if (!porCurso.has(k)) porCurso.set(k, []);
+    porCurso.get(k).push(p);
+  }
+  const nProp = PROPOSTAS.reduce((s,p) => s + (p.propostos || []).length, 0);
+  const linhaVideo = v => `<tr><td>${esc(v.nome) || "—"}</td>
+      <td class="mono">${esc(v.id) || "—"}</td><td>${esc(v.dur || "")}</td></tr>`;
+  let corpo = "";
+  for (const [curso, lista] of [...porCurso.entries()].sort((a,b) => a[0].localeCompare(b[0]))){
+    corpo += `<h2>${esc(curso)}</h2>`;
+    for (const p of lista){
+      const alvo = p.nivel === "video" ? p.video_atual : p.nivel === "aula" ? p.aula : p.capitulo;
+      const crumb = [p.nivel !== "capitulo" ? p.capitulo : "", p.nivel === "video" ? p.aula : ""]
+        .filter(Boolean).map(esc).join(" &rsaquo; ");
+      corpo += `<div class="card">
+        <div class="card-topo">
+          <div>
+            <span class="nivel">${esc(NIVEL_ROT[p.nivel] || p.nivel)}</span>
+            <b class="alvo">${esc(alvo)}</b>
+            ${crumb ? `<div class="crumb">${crumb}</div>` : ""}
+          </div>
+          <span class="st st-${esc(p.status || "proposta")}">${STATUS_ROT[p.status] || esc(p.status || "")}</span>
+        </div>
+        <div class="cols">
+          <div><h4>Vídeos atuais (${(p.videos_atuais || []).length})</h4>
+            <table><tr><th>Nome</th><th>ID</th><th>Duração</th></tr>
+            ${(p.videos_atuais || []).map(linhaVideo).join("") || "<tr><td colspan=3>—</td></tr>"}</table></div>
+          <div class="col-prop"><h4>→ Vídeos propostos (${(p.propostos || []).length})</h4>
+            <table><tr><th>Nome</th><th>ID</th><th></th></tr>
+            ${(p.propostos || []).map(linhaVideo).join("") || "<tr><td colspan=3>—</td></tr>"}</table></div>
+        </div>
+        ${p.observacao ? `<div class="obs">💬 ${esc(p.observacao)}</div>` : ""}
+        ${p.professores ? `<div class="prof">Professor(es): ${esc(p.professores)}</div>` : ""}
+      </div>`;
+    }
+  }
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Propostas de substituição de vídeos — LDI — ${hoje}</title>
+<style>
+  body{font:14px/1.5 "Segoe UI",system-ui,sans-serif; color:#1F2130; background:#fff;
+       max-width:960px; margin:0 auto; padding:28px 24px}
+  header{border-bottom:3px solid #7C3AED; padding-bottom:14px; margin-bottom:20px}
+  header h1{font-size:21px; margin:0}
+  header .meta{color:#6B6E85; font-size:13px; margin-top:5px}
+  h2{font-size:16px; color:#5B21B6; margin:26px 0 10px; border-bottom:1px solid #E5E3EF;
+     padding-bottom:5px}
+  .card{border:1px solid #E5E3EF; border-radius:12px; padding:14px 16px; margin-bottom:12px;
+        break-inside:avoid}
+  .card-topo{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+             margin-bottom:8px}
+  .nivel{display:inline-block; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+         background:#EDE9FE; color:#5B21B6; padding:2px 9px; border-radius:999px; margin-right:7px}
+  .alvo{font-size:14.5px}
+  .crumb{color:#6B6E85; font-size:12px; margin-top:3px}
+  .st{font-size:12px; padding:3px 11px; border-radius:999px; white-space:nowrap; flex-shrink:0}
+  .st-proposta{background:#FEF3C7; color:#92400E}
+  .st-enviada{background:#DBEAFE; color:#1E40AF}
+  .st-atendida{background:#DCFCE7; color:#166534}
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}}
+  .cols h4{font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:#6B6E85;
+           margin:0 0 5px}
+  .col-prop h4{color:#166534}
+  table{width:100%; border-collapse:collapse; font-size:12.5px}
+  th{text-align:left; color:#6B6E85; font-weight:600; font-size:11px; padding:3px 6px;
+     border-bottom:1px solid #E5E3EF}
+  td{padding:3px 6px; border-bottom:1px solid #F1F0F7; vertical-align:top}
+  .col-prop td{background:#F0FDF4}
+  .mono{font-family:Consolas,monospace; white-space:nowrap}
+  .obs{margin-top:9px; font-size:13px; background:#F6F5FA; border-radius:8px; padding:7px 11px}
+  .prof{margin-top:6px; color:#6B6E85; font-size:12px}
+  footer{margin-top:26px; color:#9a9cb0; font-size:11.5px; text-align:center}
+  @media print{body{padding:0} .card{page-break-inside:avoid}}
+</style></head><body>
+<header>
+  <h1>🎬 Propostas de substituição de vídeos — LDI</h1>
+  <div class="meta">Gerado em ${hoje} · ${PROPOSTAS.length} proposta(s) ·
+    ${nProp} vídeo(s) proposto(s) · ${porCurso.size} curso(s)</div>
+</header>
+${corpo}
+<footer>Gerado pelo Visualizador LDI · uso interno</footer>
+</body></html>`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([html], {type: "text/html;charset=utf-8"}));
+  a.download = "propostas_videos_LDI_" + dataArquivo() + ".html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("Relatório gerado! Envie o arquivo baixado aos times (Ctrl+P nele vira PDF).");
+}
+
+function exportarPropostasCSV(){
+  if (!PROPOSTAS.length) return toast("Nenhuma proposta cadastrada.");
+  const escCsv = v => '"' + String(v ?? "").replace(/"/g,'""') + '"';
+  const cab = ["curso","nivel","capitulo","aula","video_atual","status",
+               "proposto_nome","proposto_id","observacao","atualizada_em"];
+  const linhas = [];
+  for (const p of PROPOSTAS){
+    const base = [(p.curso_nome || "").trim(), NIVEL_ROT[p.nivel] || p.nivel,
+                  p.capitulo || "", p.aula || "", p.video_atual || "",
+                  STATUS_ROT[p.status] || p.status || ""];
+    const props = (p.propostos && p.propostos.length) ? p.propostos : [{nome:"",id:""}];
+    for (const v of props)
+      linhas.push([...base, v.nome, v.id, p.observacao || "", p.atualizada_em || ""]
+        .map(escCsv).join(";"));
+  }
+  const csv = "﻿" + [cab.join(";"), ...linhas].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], {type: "text/csv;charset=utf-8"}));
+  a.download = "propostas_videos_LDI_" + dataArquivo() + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`Exportadas ${linhas.length} linha(s) de proposta.`);
+}
+
+/* ========= preenchimento inline de IDs (modo coluna) =========== */
+let modoPreencher = false;
+
+function toggleModoPreencher(){
+  modoPreencher = !modoPreencher;
+  $("btnModoPreencher").classList.toggle("primario", modoPreencher);
+  renderArvore();
+  if (modoPreencher)
+    toast("✏️ Digite os IDs (ex.: 245017 245018) na frente do tópico/aula/vídeo e dê Tab ou Enter — o nome vem sozinho do estoque.");
+}
+function inlineProp(nivel, i, l){
+  if (!modoPreencher || i < 0) return "";
+  const p = PROP_IDX.get(chaveProp(nivel, l));
+  const ids = p ? (p.propostos || []).map(v => v.id).filter(Boolean).join(" ") : "";
+  const nomes = p ? (p.propostos || []).map(v => v.nome).filter(Boolean).join(" · ") : "";
+  return `<input class="prop-inline ${ids ? "ok" : ""}" placeholder="IDs p/ substituir…"
+    value="${esc(ids)}" title="${esc(nomes)}" spellcheck="false"
+    onclick="event.stopPropagation()"
+    onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur()}"
+    onchange="salvarInline('${nivel}', ${i}, this)">`;
+}
+function montarCorpoProposta(nivel, l, pAntes){
+  return {
+    id: pAntes ? pAntes.id : "",
+    nivel, chave: chaveProp(nivel, l),
+    dataset: $("selDataset").value,
+    curso_id: l.curso_id, curso_nome: (l.curso_nome || "").trim(),
+    capitulo: (l.capitulo_ordem ? l.capitulo_ordem + ". " : "") + (l.capitulo_nome || ""),
+    aula: nivel !== "capitulo" ? l.aula_path + " — " + l.aula_nome : "",
+    video_atual: nivel === "video" ? (l.video_nome || "") : "",
+    professores: profsDe(l).join(" | "),
+    videos_atuais: videosAtuaisDe(nivel, l),
+    observacao: pAntes ? (pAntes.observacao || "") : "",
+    status: pAntes ? (pAntes.status || "proposta") : "proposta",
+  };
+}
+async function salvarInline(nivel, i, inp){
+  const l = LINHAS[i];
+  const pAntes = PROP_IDX.get(chaveProp(nivel, l));
+  const ids = inp.value.match(/\d{3,8}/g) || [];
+  inp.value = ids.join(" ");
+  // entradas só-nome (sem ID, criadas no formulário) são preservadas
+  const soNome = pAntes ? (pAntes.propostos || []).filter(v => !v.id && v.nome) : [];
+
+  if (!ids.length){
+    inp.classList.remove("ok", "parcial");
+    inp.title = "";
+    if (!pAntes) return;
+    if (!soNome.length && !(pAntes.observacao || "").trim()){
+      await fetch("/api/propostas/excluir", {method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({id: pAntes.id})});
+      await carregarPropostas();
+      toast("Proposta removida (campo esvaziado).");
+    } else {
+      const corpo = montarCorpoProposta(nivel, l, pAntes);
+      corpo.propostos = soNome;
+      await fetch("/api/propostas", {method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)});
+      await carregarPropostas();
+      toast("IDs removidos (observação/nomes manuais mantidos).");
+    }
+    return;
+  }
+
+  // resolve os nomes no estoque pelo ID
+  let res = {encontrados: {}, faltando: ids};
+  try{
+    const r = await fetch("/api/estoque/resolver", {method: "POST",
+      headers: {"Content-Type": "application/json"}, body: JSON.stringify({ids})});
+    if (r.ok) res = await r.json();
+  } catch(e){}
+  const corpo = montarCorpoProposta(nivel, l, pAntes);
+  corpo.propostos = [
+    ...ids.map(id => ({nome: (res.encontrados[id] || {}).titulo || "", id})),
+    ...soNome];
+  const r2 = await fetch("/api/propostas", {method: "POST",
+    headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)});
+  if (!r2.ok){
+    const e = await r2.json().catch(() => ({}));
+    return toast(e.erro || "Erro ao salvar a proposta.");
+  }
+  await carregarPropostas();
+  const nomes = ids.map(id => {
+    const e = res.encontrados[id];
+    if (!e) return id + " ⚠não achado";
+    return `${e.titulo}${e.ano ? " (" + e.ano + ")" : ""}${e.fora_da_arvore ? " ⚠fora da árvore atual" : ""}`;
+  });
+  const nForaArvore = ids.filter(id => (res.encontrados[id] || {}).fora_da_arvore).length;
+  inp.title = nomes.join(" · ");
+  inp.classList.toggle("ok", !res.faltando.length && !nForaArvore);
+  inp.classList.toggle("parcial", !!res.faltando.length || !!nForaArvore);
+  toast(res.faltando.length
+    ? `Salvo com aviso: ID(s) fora do estoque: ${res.faltando.join(", ")} ⚠`
+    : nForaArvore
+    ? `Salvo com aviso: ${nForaArvore} ID(s) fora da árvore ATUAL do professor ⚠ (veja no campo)`
+    : `Proposta salva: ${nomes.join(" · ").slice(0, 90)} ✔`);
+}
+
+/* ============ copiar tabela + relatório da árvore ============== */
+function rotDepara(l){
+  if (l.depara_ok === "sim")
+    return l.depara_confere === "nao" ? "casado, duração diverge ⚠" : "casado";
+  return ehVideo(l) && idAntigo(l) ? "não casou" : "";
+}
+function resumoFiltros(){
+  const p = [];
+  const busca = $("fBusca").value.trim();
+  if (busca) p.push(`busca "${busca}"`);
+  if (cursosAtivos.size) p.push(`${cursosAtivos.size} curso(s) selecionado(s)`);
+  if (anosGravAtivos.size) p.push("ano gravação: " + [...anosGravAtivos].join(", "));
+  if (anosAtivos.size) p.push("ano acervo: " + [...anosAtivos].join(", "));
+  if ($("fDepara").value) p.push("de→para: " + $("fDepara").selectedOptions[0].textContent);
+  const profs = [...document.querySelectorAll("#fProfs input:checked")].map(i => i.value);
+  if (profs.length) p.push("professor: " + profs.join(", "));
+  const tiposOff = [...document.querySelectorAll("#fTipos input:not(:checked)")].map(i => i.value);
+  if (tiposOff.length) p.push("tipos fora: " + tiposOff.join(", "));
+  if ($("fPublicado").value) p.push("publicados: " + $("fPublicado").value);
+  if ($("fRascunho").value) p.push("rascunho: " + $("fRascunho").value);
+  if ($("fIdAntigo").value) p.push("ID antigo: " + $("fIdAntigo").value);
+  if ($("fDurMin").value || $("fDurMax").value)
+    p.push(`duração ${$("fDurMin").value || "0"}–${$("fDurMax").value || "∞"} min`);
+  if ($("fSoErros").checked) p.push("só erros/pendências");
+  if (excluidos.size) p.push(excluidos.size + " curso(s) removido(s)");
+  return p.join(" · ") || "nenhum (dados completos da extração)";
+}
+function copiarArvore(){
+  if (!FILTRADAS.length) return toast("Nada para copiar com os filtros atuais.");
+  const cab = ["Curso","Capítulo","Aula","Vídeo","ID antigo","Duração","Ano acervo",
+               "Ano gravação real","Tipo","Rascunho","De→para","Erro"];
+  const limpa = v => String(v ?? "").replace(/[\t\r\n]+/g, " ").trim();
+  const linhas = FILTRADAS.map(l => [
+    (l.curso_nome || "").trim(),
+    (l.capitulo_ordem ? l.capitulo_ordem + ". " : "") + (l.capitulo_nome || ""),
+    (l.aula_path ? l.aula_path + " — " : "") + (l.aula_nome || ""),
+    ehVideo(l) ? (l.video_nome || "(sem nome)") : "",
+    ehVideo(l) ? idAntigo(l) : "",
+    ehVideo(l) ? fmtDur(l.video_duracao_seg) : "",
+    ehVideo(l) ? anoDe(l) : "",
+    ehVideo(l) ? (l.gravacao_ano || "") : "",
+    l.bloco_tipo || "",
+    l.bloco_rascunho === "sim" ? "sim" : "",
+    rotDepara(l),
+    l.erro || "",
+  ].map(limpa).join("\t"));
+  const tsv = [cab.join("\t"), ...linhas].join("\r\n");
+  navigator.clipboard.writeText(tsv).then(
+    () => toast(`Tabela copiada (${linhas.length} linhas) — cole no Excel/Sheets. ✔`),
+    () => toast("Não consegui acessar a área de transferência — tente de novo."));
+}
+function gerarRelatorioArvore(){
+  if (!FILTRADAS.length) return toast("Nada para gerar com os filtros atuais.");
+  const vids = FILTRADAS.filter(ehVideo);
+  const durTotal = vids.reduce((s,l) => s + (+l.video_duracao_seg || 0), 0);
+  const unicos = new Set(vids.map(l => l.video_id)).size;
+  const agora = new Date();
+  const dataset = $("selDataset").selectedOptions[0]
+    ? $("selDataset").selectedOptions[0].textContent : "";
+
+  // agrupa igual à tela
+  const cursos = new Map();
+  for (const l of FILTRADAS){
+    if (!cursos.has(l.curso_id)) cursos.set(l.curso_id, {info:l, caps:new Map(), n:0, dur:0});
+    const c = cursos.get(l.curso_id);
+    const capKey = l.capitulo_id + "|" + l.capitulo_nome;
+    if (!c.caps.has(capKey)) c.caps.set(capKey, {info:l, aulas:new Map(), n:0, dur:0});
+    const cap = c.caps.get(capKey);
+    if (!cap.aulas.has(l.item_id)) cap.aulas.set(l.item_id, {info:l, vids:[]});
+    cap.aulas.get(l.item_id).vids.push(l);
+    if (ehVideo(l)){ c.n++; cap.n++;
+      c.dur += +l.video_duracao_seg || 0; cap.dur += +l.video_duracao_seg || 0; }
+  }
+  let corpo = "";
+  for (const [, c] of cursos){
+    corpo += `<div class="no-curso"><div class="cab1">
+      <span class="nome">${esc(c.info.curso_nome)}</span>
+      ${c.info.curso_publicado === "nao" ? '<span class="badge cinza">não publicado</span>' : ""}
+      <span class="badge roxo">${c.n} vídeos</span>
+      <span class="badge">${fmtDurLonga(c.dur)}</span></div>`;
+    for (const [, cap] of c.caps){
+      corpo += `<div class="cab2">
+        <span class="nome">${cap.info.capitulo_ordem ? cap.info.capitulo_ordem + ". " : ""}${esc(cap.info.capitulo_nome) || "(capítulo sem nome)"}</span>
+        ${badgeProp("capitulo", cap.info)}
+        <span class="badge roxo">${cap.n}</span>
+        <span class="badge">${fmtDurLonga(cap.dur)}</span></div>`;
+      for (const [, aula] of cap.aulas){
+        corpo += `<div class="cab3">
+          <span class="nome">${esc(aula.info.aula_path)} — ${esc(aula.info.aula_nome)}</span>
+          ${badgeProp("aula", aula.info)}
+          <span class="badge roxo">${aula.vids.filter(ehVideo).length}</span></div>`;
+        for (const v of aula.vids){
+          if (!ehVideo(v)){
+            corpo += `<div class="vid erro">⚠ ${esc(v.erro)}</div>`;
+            continue;
+          }
+          corpo += `<div class="vid">
+            <span class="nome">▶ ${esc(v.video_nome) || "(sem nome)"}</span>
+            ${v.bloco_tipo === "cast" ? '<span class="badge ambar">cast</span>' : ""}
+            ${v.bloco_tipo === "youtube" ? '<span class="badge verm">youtube</span>' : ""}
+            ${v.bloco_rascunho === "sim" ? '<span class="badge cinza">rascunho</span>' : ""}
+            ${idAntigo(v) ? `<span class="badge azul">antigo ${esc(idAntigo(v))}</span>`
+                          : '<span class="badge ambar">sem ID antigo</span>'}
+            ${v.depara_ok === "sim" ? `<span class="badge verde">🎥 ${esc(v.gravacao_ano)}</span>`
+              : (idAntigo(v) ? '<span class="badge cinza">não casou</span>' : "")}
+            ${badgeProp("video", v)}
+            <span class="meta">${fmtDur(v.video_duracao_seg)}</span>
+            <span class="meta">${anoDe(v)}</span></div>`;
+        }
+      }
+    }
+    corpo += `</div>`;
+  }
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Vídeos LDI — ${esc(dataset)} — ${agora.toLocaleDateString("pt-BR")}</title>
+<style>
+  body{font:13.5px/1.45 "Segoe UI",system-ui,sans-serif; color:#1F2130; background:#fff;
+       max-width:1100px; margin:0 auto; padding:26px 22px}
+  header{border-bottom:3px solid #7C3AED; padding-bottom:12px; margin-bottom:16px}
+  header h1{font-size:20px; margin:0}
+  header .meta{color:#6B6E85; font-size:12.5px; margin-top:5px}
+  .kpis{display:flex; flex-wrap:wrap; gap:16px; margin:12px 0 18px}
+  .kpi{border:1px solid #E5E3EF; border-radius:10px; padding:8px 14px}
+  .kpi b{display:block; font-size:18px; color:#5B21B6}
+  .kpi span{font-size:11px; color:#6B6E85}
+  .no-curso{border:1px solid #E5E3EF; border-radius:12px; margin-bottom:14px;
+            overflow:hidden; break-inside:avoid-page}
+  .cab1,.cab2,.cab3,.vid{display:flex; align-items:center; gap:7px; padding:6px 12px;
+                          border-bottom:1px solid #F1F0F7}
+  .cab1{background:#EDE9FE; font-weight:700; font-size:14px}
+  .cab2{padding-left:28px; font-weight:600; background:#FAF9FE}
+  .cab3{padding-left:46px; color:#33364a}
+  .vid{padding-left:66px; font-size:12.6px}
+  .vid.erro{color:#DC2626}
+  .nome{flex:1; min-width:0}
+  .badge{font-size:10px; padding:1px 8px; border-radius:999px; white-space:nowrap;
+         background:#F6F5FA; color:#6B6E85; flex-shrink:0}
+  .badge.roxo{background:#EDE9FE; color:#5B21B6}
+  .badge.ambar{background:#FEF3C7; color:#92400E}
+  .badge.verm{background:#FEE2E2; color:#991B1B}
+  .badge.azul{background:#DBEAFE; color:#1E40AF}
+  .badge.cinza{background:#F3F4F6; color:#4B5563}
+  .badge.verde{background:#DCFCE7; color:#166534}
+  .meta{color:#6B6E85; font-size:11px; white-space:nowrap; flex-shrink:0}
+  footer{margin-top:22px; color:#9a9cb0; font-size:11px; text-align:center}
+  @media print{body{padding:0}}
+</style></head><body>
+<header>
+  <h1>🎬 Vídeos LDI — Cursos → Capítulos → Aulas → Vídeos</h1>
+  <div class="meta">Extração: <b>${esc(dataset)}</b> · gerado em
+    ${agora.toLocaleDateString("pt-BR")} ${agora.toLocaleTimeString("pt-BR").slice(0,5)}</div>
+  <div class="meta">Filtros: ${esc(resumoFiltros())}</div>
+</header>
+<div class="kpis">
+  <div class="kpi"><b>${cursos.size}</b><span>cursos</span></div>
+  <div class="kpi"><b>${vids.length}</b><span>vídeos (ocorrências)</span></div>
+  <div class="kpi"><b>${unicos}</b><span>vídeos únicos</span></div>
+  <div class="kpi"><b>${fmtDurLonga(durTotal)}</b><span>duração total</span></div>
+</div>
+${corpo}
+<footer>Gerado pelo Visualizador LDI · uso interno</footer>
+</body></html>`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([html], {type: "text/html;charset=utf-8"}));
+  a.download = "arvore_videos_LDI_" + dataArquivo() + ".html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("Relatório da árvore gerado! (abre em qualquer navegador; Ctrl+P vira PDF)");
+}
+
+/* ========== sugestão automática do estoque (de→para) =========== */
+let sugCtx = null;      // {raiz, topicos, resultados, atuais, alvoNome}
+let sugDebounce = null;
+
+function alvoDaProposta(){
+  const {nivel, linha: l, base: p} = propostaCtx;
+  if (l) return nivel === "capitulo" ? (l.capitulo_nome || "")
+       : nivel === "aula" ? (l.aula_nome || "") : (l.video_nome || "");
+  return nivel === "capitulo" ? (p.capitulo || "")
+       : nivel === "aula" ? (p.aula || "") : (p.video_atual || "");
+}
+function raizesDoAlvo(){
+  // professores REAIS do alvo = raízes (mb_raiz) dos vídeos já vinculados, por votos
+  const {nivel, linha: l} = propostaCtx;
+  if (!l) return [];
+  let rows;
+  if (nivel === "capitulo")
+    rows = LINHAS.filter(x => x.curso_id === l.curso_id && x.capitulo_id === l.capitulo_id);
+  else if (nivel === "aula")
+    rows = LINHAS.filter(x => x.curso_id === l.curso_id && x.item_id === l.item_id);
+  else rows = [l];
+  const cont = new Map();
+  rows.filter(ehVideo).forEach(v => {
+    const r = (v.mb_raiz || "").trim();
+    if (r) cont.set(r, (cont.get(r) || 0) + 1);
+  });
+  return [...cont.entries()].sort((a, b) => b[1] - a[1]);
+}
+function abrirModalSugestao(){
+  if (!propostaCtx) return;
+  const l = propostaCtx.linha, p = propostaCtx.base;
+  sugCtx = {raiz: "", topicos: [], resultados: [],
+            atuais: l ? videosAtuaisDe(propostaCtx.nivel, l) : ((p && p.videos_atuais) || []),
+            alvoNome: alvoDaProposta()};
+  $("modalProposta").classList.remove("aberto");
+  $("modalSugestao").classList.add("aberto");
+  $("campoSugTopicos").style.display = "none";
+  $("sugResultados").innerHTML = "";
+  $("btnAddSug").style.display = "none";
+  fetch("/api/estoque/status").then(r => r.json()).then(s => {
+    $("sugCacheInfo").innerHTML = s.existe
+      ? `Estoque: <b>${(s.n_arvores || 0).toLocaleString("pt-BR")}</b> vídeos em
+         <b>${s.n_profs_frescos || 0}</b> árvores atuais 🌿 (pasta da Limpeza) +
+         <b>${(s.n_videos - (s.n_arvores || 0)).toLocaleString("pt-BR")}</b> da base ampla ·
+         atualizado em <b>${esc(s.atualizado_em)}</b>.`
+      : `<span style="color:var(--vermelho)">⚠ Nenhuma fonte de estoque — exporte as árvores
+         na Limpeza ou rode o _depara_metabase.bat.</span>`;
+  }).catch(() => {});
+  // professor detectado pelos vídeos vinculados (mb_raiz), não pelo nome do curso
+  const detectadas = raizesDoAlvo();
+  $("sugRaizDetect").innerHTML = detectadas.length
+    ? `<span class="ajuda" style="margin:0">Detectado pelos vídeos vinculados:</span> ` +
+      detectadas.slice(0, 4).map(([r, n]) =>
+        `<button class="chip" style="margin-left:4px" title="usar esta árvore"
+          onclick="$('sugRaizBusca').value = this.dataset.r; buscarRaizes(); escolherRaiz(this.dataset.r)"
+          data-r="${esc(r)}">🎯 ${esc(r)} <small>(${n} vídeo${n > 1 ? "s" : ""})</small></button>`).join("")
+    : `<span class="ajuda" style="margin:0">Nenhum vídeo do alvo casado no de→para —
+       busque o professor pelo nome abaixo.</span>`;
+  const prof = detectadas.length ? detectadas[0][0]
+    : (l ? (profsDe(l)[0] || "") : ((p && (p.professores || "").split("|")[0]) || ""))
+        .replace(/^(Profs?|Prfs?|Prfo|Prof[ª°]?|Equipe)\.?\s*/i, "").trim();
+  $("sugRaizBusca").value = prof;
+  buscarRaizes();
+  if (detectadas.length) escolherRaiz(detectadas[0][0]);
+}
+function voltarProposta(){
+  $("modalSugestao").classList.remove("aberto");
+  $("modalProposta").classList.add("aberto");
+}
+function buscarRaizesDebounce(){
+  clearTimeout(sugDebounce);
+  sugDebounce = setTimeout(buscarRaizes, 300);
+}
+async function buscarRaizes(){
+  const q = $("sugRaizBusca").value.trim();
+  let r;
+  try{ r = await fetch("/api/estoque/raizes?q=" + encodeURIComponent(q)); }
+  catch(e){ return; }
+  if (!r.ok){
+    const e = await r.json().catch(() => ({}));
+    $("sugRaizes").innerHTML = `<span class='ajuda'>${esc(e.erro || "erro ao consultar o estoque")}</span>`;
+    return;
+  }
+  const lista = await r.json();
+  $("sugRaizes").innerHTML = lista.map(x =>
+    `<label title="${x.fresca ? "árvore atual (xlsx da Limpeza)" : "base ampla (question 19885)"}">
+       <input type="radio" name="sugRaiz" value="${esc(x.raiz)}"
+       ${sugCtx.raiz === x.raiz ? "checked" : ""} onchange="escolherRaiz(this.value)">
+       <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${x.fresca ? "🌿 " : ""}${esc(x.raiz)}</span>
+       <span class="ajuda" style="margin:0; flex-shrink:0">· ${x.n}</span></label>`).join("")
+    || "<span class='ajuda'>nenhum professor encontrado — tente outra parte do nome</span>";
+}
+async function escolherRaiz(raiz){
+  sugCtx.raiz = raiz;
+  $("campoSugTopicos").style.display = "block";
+  $("sugTopicos").innerHTML = "<span class='ajuda'>carregando tópicos...</span>";
+  const r = await fetch(`/api/estoque/topicos?raiz=${encodeURIComponent(raiz)}&q=${encodeURIComponent(sugCtx.alvoNome)}`);
+  sugCtx.topicos = r.ok ? await r.json() : [];
+  sugCtx.topicos.forEach((t, i) => t.sel = (i === 0 && t.score >= 0.45));
+  $("sugTopBusca").value = "";
+  renderTopicos();
+}
+function renderTopicos(){
+  const busca = ($("sugTopBusca").value || "").toLowerCase();
+  $("sugTopicos").innerHTML = sugCtx.topicos.map((t, i) => ({t, i}))
+    .filter(({t}) => !busca || t.path.toLowerCase().includes(busca))
+    .map(({t, i}) => `<label title="${esc(t.path)}">
+       <input type="checkbox" ${t.sel ? "checked" : ""}
+              onchange="sugCtx.topicos[${i}].sel = this.checked; atualizarNTop()">
+       <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+         ${t.score >= 0.75 ? "🎯 " : t.score >= 0.45 ? "≈ " : ""}${esc(t.path)}</span>
+       <span class="ajuda" style="margin:0; flex-shrink:0">· ${t.n}</span></label>`).join("")
+    || "<span class='ajuda'>—</span>";
+  atualizarNTop();
+}
+function atualizarNTop(){
+  $("sugNTop").textContent = sugCtx.topicos.filter(t => t.sel).length;
+}
+async function buscarSugestoes(){
+  const paths = sugCtx.topicos.filter(t => t.sel).map(t => t.path);
+  if (!paths.length) return toast("Marque ao menos um tópico para varrer.");
+  $("sugResultados").innerHTML = "<p class='ajuda' style='margin-top:10px'>buscando no estoque...</p>";
+  const r = await fetch("/api/estoque/sugerir", {method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({raiz: sugCtx.raiz, paths,
+      atuais: sugCtx.atuais.map(a => ({nome: a.nome, id: a.id}))})});
+  if (!r.ok){
+    const e = await r.json().catch(() => ({}));
+    $("sugResultados").innerHTML = `<p class='ajuda'>${esc(e.erro || "erro na busca")}</p>`;
+    return;
+  }
+  sugCtx.resultados = (await r.json()).itens || [];
+  renderResultadosSug();
+}
+function renderResultadosSug(){
+  const its = sugCtx.resultados;
+  if (!its.length){
+    $("sugResultados").innerHTML =
+      "<p class='ajuda' style='margin-top:10px'>Nenhum vídeo do estoque nos tópicos marcados.</p>";
+    $("btnAddSug").style.display = "none";
+    return;
+  }
+  const idsAtuais = new Set(sugCtx.atuais.map(a => String(a.id)).filter(Boolean));
+  let html = `<div class="ajuda" style="margin-top:10px">${its.length} vídeo(s) encontrados.
+    Os <b>pré-marcados</b> têm nome muito parecido com um vídeo atual e ID diferente
+    (provável regravação). Revise antes de adicionar.</div><div class="sug-caixa">`;
+  let pathAtual = null;
+  its.forEach((v, i) => {
+    if (v.path !== pathAtual){
+      pathAtual = v.path;
+      html += `<div class="sug-path" title="${esc(v.path)}">📁 ${esc(v.path)}</div>`;
+    }
+    const emUso = idsAtuais.has(String(v.id));
+    if (v.marcado == null) v.marcado = !emUso && v.sim >= 0.75;
+    const simPct = Math.round(v.sim * 100);
+    html += `<div class="sug-item">
+      <input type="checkbox" ${v.marcado ? "checked" : ""} ${emUso ? "disabled" : ""}
+             onchange="sugCtx.resultados[${i}].marcado = this.checked">
+      <span class="nm" title="${esc(v.titulo)}">${esc(v.titulo)}</span>
+      <span class="badge azul">ID ${esc(v.id)}</span>
+      ${v.ano ? `<span class="badge verde">🎥 ${esc(v.ano)}</span>` : ""}
+      ${v.dur ? `<span class="meta">${esc(v.dur)}</span>` : ""}
+      ${v.status && v.status !== "Disponível" ? `<span class="badge ambar">${esc(v.status)}</span>` : ""}
+      ${emUso ? '<span class="badge cinza">já está no alvo</span>'
+        : v.sim >= 0.75 ? `<span class="badge verde" title="parecido com: ${esc(v.match_nome)}">≈ ${simPct}% de “${esc(v.match_nome)}”</span>`
+        : v.sim >= 0.5 ? `<span class="badge ambar" title="parecido com: ${esc(v.match_nome)}">≈ ${simPct}%</span>`
+        : '<span class="badge cinza">novo (sem par no alvo)</span>'}
+    </div>`;
+  });
+  html += "</div>";
+  $("sugResultados").innerHTML = html;
+  $("btnAddSug").style.display = "inline-flex";
+}
+function adicionarSugestoes(){
+  const marcados = sugCtx.resultados.filter(v => v.marcado);
+  if (!marcados.length) return toast("Marque ao menos um vídeo sugerido.");
+  [...$("propLista").querySelectorAll(".prop-linha")].forEach(r => {
+    if (!r.querySelector(".pnome").value.trim() && !r.querySelector(".pid").value.trim())
+      r.remove();
+  });
+  marcados.forEach(v => addLinhaProposto(v.titulo, v.id));
+  voltarProposta();
+  toast(`${marcados.length} vídeo(s) adicionados à proposta — revise e salve. ✔`);
+}
+
+/* ===================== exportar CSV ============================ */
+function exportarCSV(){
+  if (!FILTRADAS.length) return toast("Nada para exportar com os filtros atuais.");
+  const colunas = Object.keys(FILTRADAS[0]);
+  const escCsv = v => '"' + String(v ?? "").replace(/"/g,'""') + '"';
+  const csv = "﻿" + [colunas.join(";"),
+    ...FILTRADAS.map(l => colunas.map(c => escCsv(l[c])).join(";"))].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
+  a.download = "videos_filtrado_" + dataArquivo() + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`Exportadas ${FILTRADAS.length} linhas.`);
+}
+
+/* ======================== cookie =============================== */
+async function atualizarStatusCookie(){
+  try{
+    const r = await fetch("/api/cookie/status");
+    const s = await r.json();
+    const pill = $("pillCookie");
+    pill.classList.remove("ok","aviso","erro");
+    let texto, classe;
+    if (s.valido && (s.dias_restantes == null || s.dias_restantes > 7)){
+      classe = "ok"; texto = `🍪 Cookie ok${s.dias_restantes ? " · " + Math.floor(s.dias_restantes) + "d" : ""}`;
+    } else if (s.valido){
+      classe = "aviso"; texto = `🍪 Vence em ${Math.max(0, Math.floor(s.dias_restantes))}d`;
+    } else {
+      classe = "erro"; texto = "🍪 Cookie vencido — clique";
+    }
+    pill.classList.add(classe);
+    $("pillCookieTexto").textContent = texto;
+
+    $("cookieStatusCaixa").innerHTML = `
+      <div class="lin"><span>Situação</span><b style="color:${s.valido ? "var(--verde)" : "var(--vermelho)"}">
+        ${s.valido ? "✔ válido (API respondeu 200)" : "✖ inválido/vencido (HTTP " + (s.http ?? "—") + ")"}</b></div>
+      <div class="lin"><span>Conta</span><b>${esc(s.email) || "—"}</b></div>
+      <div class="lin"><span>Expira em</span><b>${esc(s.expira_em) || "—"}
+        ${s.dias_restantes != null ? " (~" + s.dias_restantes.toFixed(0) + " dias)" : ""}</b></div>
+      <div class="lin"><span>cookie.txt atualizado em</span><b>${esc(s.atualizado_em) || "—"}</b></div>`;
+  } catch(e){ /* servidor fora */ }
+}
+function abrirModalCookie(){
+  $("modalCookie").classList.add("aberto");
+  atualizarStatusCookie();
+}
+async function salvarCookie(){
+  const valor = $("cookieNovo").value.trim();
+  if (!valor) return toast("Cole o cookie primeiro.");
+  const r = await fetch("/api/cookie", {method:"POST",
+    headers:{"Content-Type":"application/json"}, body:JSON.stringify({cookie:valor})});
+  const s = await r.json();
+  if (r.ok){
+    $("cookieNovo").value = "";
+    toast(s.valido ? "Cookie salvo e válido! ✔" : "Cookie salvo, mas a API ainda recusa (HTTP " + s.http + ")");
+    atualizarStatusCookie();
+  } else toast(s.erro || "Erro ao salvar.");
+}
+
+/* ======================= extração ============================== */
+function abrirModalExtrair(){
+  $("modalExtrair").classList.add("aberto");
+  $("extrairProgresso").style.display = "none";
+  $("btnIniciarExtracao").disabled = false;
+  verificarExtracaoEmAndamento();
+}
+async function iniciarExtracao(){
+  const termo = $("termoExtrair").value.trim();
+  const r = await fetch("/api/extrair", {method:"POST",
+    headers:{"Content-Type":"application/json"}, body:JSON.stringify({termo})});
+  if (!r.ok){ const e = await r.json(); return toast(e.erro || "Erro."); }
+  $("btnIniciarExtracao").disabled = true;
+  acompanharExtracao();
+}
+function verificarExtracaoEmAndamento(){
+  fetch("/api/extrair/status").then(r => r.json()).then(s => {
+    if (s.rodando) { $("btnIniciarExtracao").disabled = true; acompanharExtracao(); }
+  });
+}
+function acompanharExtracao(){
+  $("extrairProgresso").style.display = "block";
+  clearInterval(pollExtracao);
+  pollExtracao = setInterval(async () => {
+    const s = await (await fetch("/api/extrair/status")).json();
+    $("extrairEtapa").textContent = s.etapa + (s.termo ? `  (termo: ${s.termo})` : "");
+    const pct = s.total ? Math.round(s.feitos / s.total * 100) : (s.rodando ? 5 : 100);
+    $("extrairBarra").style.width = pct + "%";
+    $("extrairNums").textContent = s.total ? `${s.feitos} de ${s.total} aulas` : "";
+    if (!s.rodando){
+      clearInterval(pollExtracao);
+      $("btnIniciarExtracao").disabled = false;
+      if (s.erro){ toast("Extração falhou: " + s.erro); $("extrairEtapa").textContent = "Falhou: " + s.erro; }
+      else if (s.arquivo){
+        toast("Extração concluída! Carregando dados novos...");
+        fecharModais();
+        await carregarExtracoes(s.arquivo);
+      }
+    }
+  }, 1500);
+}
+
+/* ===================== util / init ============================= */
+function fecharModais(){
+  document.querySelectorAll(".veu").forEach(v => v.classList.remove("aberto"));
+}
+document.querySelectorAll(".veu").forEach(v =>
+  v.addEventListener("click", e => { if (e.target === v) fecharModais(); }));
+let toastTimer = null;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("mostrar");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("mostrar"), 3200);
+}
+
+(async function init(){
+  await carregarPropostas();
+  await carregarExtracoes();
+  carregarListaAnalises();
+  atualizarStatusCookie();
+  setInterval(atualizarStatusCookie, 10 * 60 * 1000); // re-verifica a cada 10 min
+  fetch("/api/extrair/status").then(r => r.json()).then(s => {
+    if (s.rodando){ abrirModalExtrair(); }
+  });
+})();
+</script>
+</body>
+</html>

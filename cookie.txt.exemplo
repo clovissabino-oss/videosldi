@@ -1,0 +1,5 @@
+COLE_AQUI_o_cookie_do_admin
+
+# Renomeie este arquivo para "cookie.txt" e substitua a linha acima pelo cookie
+# real da sessão do admin (F12 → Network → linha "cookie:"). Passo a passo no
+# TUTORIAL.md. O cookie.txt real é ignorado pelo git (contém credencial).

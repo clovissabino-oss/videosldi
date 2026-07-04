@@ -1,0 +1,24 @@
+# ===== Segredos / credenciais (NUNCA versionar) =====
+cookie.txt
+cookies.txt
+metabase_cookie.txt
+metabase_cookies.json
+*.cookie
+
+# ===== Dados e estado gerados em runtime =====
+saida/
+analises.json
+propostas.json
+
+# ===== Artefatos de build (recriáveis via PyInstaller) =====
+*.exe
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+
+# ===== Diversos =====
+.DS_Store
+Thumbs.db
+*.log
