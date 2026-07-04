@@ -36,6 +36,19 @@ class TestAtualizarTermo(unittest.TestCase):
                 cfg = json.load(f)
             self.assertEqual(cfg["termo_busca"], "Receita")
 
+    def test_config_corrompido_e_recriado_sem_estourar(self):
+        with tempfile.TemporaryDirectory() as d:
+            caminho = os.path.join(d, "config.json")
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write("{isso não é json válido")
+
+            devolvido = config_util.atualizar_termo(caminho, "PF")
+
+            self.assertEqual(devolvido, "PF")
+            with open(caminho, encoding="utf-8-sig") as f:
+                cfg = json.load(f)
+            self.assertEqual(cfg["termo_busca"], "PF")
+
 
 if __name__ == "__main__":
     unittest.main()

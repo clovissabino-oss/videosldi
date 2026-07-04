@@ -15,8 +15,11 @@ def atualizar_termo(caminho_config, termo):
     Devolve o termo gravado."""
     cfg = {}
     if os.path.exists(caminho_config):
-        with open(caminho_config, encoding="utf-8-sig") as f:
-            cfg = json.load(f)
+        try:
+            with open(caminho_config, encoding="utf-8-sig") as f:
+                cfg = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            cfg = {}  # config corrompido/vazio: recomeça só com o termo
     cfg["termo_busca"] = termo
     with open(caminho_config, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
