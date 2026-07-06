@@ -164,12 +164,16 @@ infosab). Plano executado: `docs\superpowers\plans\2026-07-05-coletor-conteudo.m
   claro (CookieVencido); falha pontual registra e segue + 1 retry; `--continuar` retoma
   `em_andamento`/`parcial`; `--com-videos` emite o videos_*.json/csv clássico.
 
-**⚠ PENDENTE — verificação com dados reais:** a coleta real do BACEN falhou com
-`AUTH.USER_SESSION_NOT_FOUND` — o cookie do LDI foi **invalidado no servidor** em ~06/07
-(não era o vencimento de 01/08; a mensagem de erro do coletor funcionou como projetado).
-**Primeiro passo da próxima sessão:** colar cookie novo (F12) e rodar
-`py coletor_ldi.py --termo BACEN --agendado`; conferir distribuição por tipo vs censo acima
-(`SELECT tipo, COUNT(*) FROM blocos GROUP BY tipo`). Depois: merge na main.
+**✅ Verificado com dados reais (06/07):** coleta do BACEN `completa`, 0 erros —
+snapshot #1: 128 cursos, **3.612 aulas únicas** (10.544 vínculos curso↔aula),
+**64.838 blocos únicos** (40.964 questions, 20.241 tiptap, 2.693 vídeos, 861 PDFs,
+78 casts). Somas por vínculo bateram com o censo da sondagem (vídeos/PDFs/casts exatos).
+Nota: o censo de "185 mil blocos" contava por vínculo; deduplicado entre cursos é ~65 mil.
+Primeiros achados de auditoria: **12.837 questões sem solução (31,3%)**, 21 cursos sem
+aula na árvore, 11 cursos sem vídeo, 3 vídeos sem ID antigo. **Amostra visual do painel**
+(dados reais, estática) publicada como Artifact na sessão — a fase 2 entrega isso como app.
+(Durante a verificação o cookie do LDI foi invalidado no servidor e recolado — o abort
+claro do 401 funcionou como projetado.)
 
 **Fases seguintes (specs próprios na hora certa):** 2-Inventário (painel.py porta 8766),
 3-Qualidade (regras SQL), 4-Evolução (diff snapshots), 5-Migração de questões (investigar
@@ -181,9 +185,11 @@ se existe fonte do sistema antigo para questões, como a 19885 é para vídeos).
 
 ### Cookies (dois sistemas, dois cookies diferentes)
 - **LDI (admin)**: `cookie.txt` na pasta do projeto. Só o `__Secure-SID` importa,
-  vale **~30 dias** — mas pode ser invalidado antes pelo servidor (o de 01/08/2026
-  morreu em ~06/07 com `AUTH.USER_SESSION_NOT_FOUND`; **está vencido, recolar**).
-  Trocar pela tela do Visualizador (botão 🍪) ou editando o arquivo.
+  vale **~30 dias** (o atual expira **05/08/2026**) — mas pode ser invalidado antes
+  pelo servidor (relogin derruba a sessão antiga: `AUTH.USER_SESSION_NOT_FOUND`).
+  Trocar pela tela do Visualizador (botão 🍪) ou editando o arquivo. Jeito à prova
+  de engano de pegar o novo: F12 → **Application** → Cookies → copiar o Value de
+  `__Secure-SID` (a aba Network guarda requisições velhas com o cookie morto).
 - **Metabase**: reusa a auth do app de Limpeza em
   `C:\⚙️ Aplicativos\🦉 Relatório de Cursos - Árvores - Professores\6. Limpeza Unificada de Dados`
   (`metabase_cookies.json` de lá). Cookie do Cloudflare vale **~24h** e **exige o Warp
