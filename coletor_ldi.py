@@ -62,8 +62,12 @@ def baixar_blocos(sessao, item_id, tentativa=1):
     return r.json().get("data") or []
 
 
-def _baixar_lote(sessao, con, extracao_id, pendentes, concorrencia):
-    """Baixa e grava as aulas pendentes; devolve {item_id: erro} das que falharam."""
+def _baixar_lote(sessao, con, extracao_id, pendentes, concorrencia, videos_por_item=None):
+    """Baixa e grava as aulas pendentes; devolve {item_id: erro} das que falharam.
+
+    videos_por_item (opcional): dict a preencher com os blocos brutos de vídeo
+    de cada aula (memória pequena) — usado pelo --com-videos.
+    """
     erros, feitos = {}, 0
     with ThreadPoolExecutor(max_workers=int(concorrencia)) as pool:
         futuros = {pool.submit(baixar_blocos, sessao, i): i for i in pendentes}
@@ -73,6 +77,9 @@ def _baixar_lote(sessao, con, extracao_id, pendentes, concorrencia):
                 brutos = fut.result()
                 metas = [parse_blocos.meta_do_bloco(b) for b in brutos]
                 banco_conteudo.gravar_blocos_da_aula(con, extracao_id, item_id, metas)
+                if videos_por_item is not None:
+                    videos_por_item[item_id] = [
+                        b for b in brutos if b.get("type") in extrator_ldi.TIPOS_VIDEO]
             except SystemExit:
                 raise
             except Exception as e:  # falha pontual: registra e segue
@@ -83,9 +90,37 @@ def _baixar_lote(sessao, con, extracao_id, pendentes, concorrencia):
     return erros
 
 
+def _emitir_videos(cfg, termo, pasta, tarefas, videos_por_item):
+    """Grava o videos_<termo>_<data>.json/csv clássico (formato do extrator)."""
+    from datetime import date
+    import csv as _csv
+    linhas = []
+    for curso, cap, item in tarefas:
+        achou = False
+        for b in videos_por_item.get(item.get("item_id", ""), []):
+            linhas.append(extrator_ldi.linha(cfg, curso, cap, item, b))
+            achou = True
+        if not achou:
+            linhas.append(extrator_ldi.linha(cfg, curso, cap, item, None,
+                                             "aula sem bloco de video na versao atual"))
+    if not linhas:
+        return
+    termo_arq = re.sub(r"[^\w\-]+", "_", termo)
+    base = os.path.join(pasta, f"videos_{termo_arq}_{date.today():%Y-%m-%d}")
+    with open(base + ".json", "w", encoding="utf-8") as f:
+        json.dump(linhas, f, ensure_ascii=False, indent=1)
+    with open(base + ".csv", "w", newline="", encoding="utf-8-sig") as f:
+        w = _csv.DictWriter(f, fieldnames=list(linhas[0].keys()),
+                            delimiter=";", quoting=_csv.QUOTE_ALL)
+        w.writeheader()
+        w.writerows(linhas)
+    print(f"      vídeos clássico: {base}.json/.csv")
+
+
 def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False):
     con = banco_conteudo.abrir(caminho_banco)
     try:
+        tarefas, videos_por_item = [], ({} if com_videos else None)
         if continuar:
             ext = banco_conteudo.extracao_em_andamento(con, termo)
             if ext is None:
@@ -104,20 +139,30 @@ def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False
             extracao_id = banco_conteudo.iniciar_extracao(con, termo, cfg["vertical"])
             n_cursos, n_aulas = banco_conteudo.gravar_arvore(con, extracao_id, cursos)
             print(f"      {n_cursos} cursos, {n_aulas} aulas únicas (snapshot #{extracao_id})")
+            if com_videos:
+                for curso in cursos:
+                    for cap in (curso.get("content_tree_cache") or []):
+                        for item in (cap.get("items") or []):
+                            tarefas.append((curso, cap, item))
 
         pendentes = banco_conteudo.aulas_pendentes(con, extracao_id)
         print(f"[2/4] {len(pendentes)} aulas a baixar")
         print(f"[3/4] Baixando blocos ({cfg['concorrencia']} por vez)...")
-        erros = _baixar_lote(sessao, con, extracao_id, pendentes, cfg["concorrencia"])
+        erros = _baixar_lote(sessao, con, extracao_id, pendentes,
+                             cfg["concorrencia"], videos_por_item)
         if erros:  # 1 rodada de retry
             print(f"      retry de {len(erros)} aulas com falha...")
-            erros = _baixar_lote(sessao, con, extracao_id, list(erros), cfg["concorrencia"])
+            erros = _baixar_lote(sessao, con, extracao_id, list(erros),
+                                 cfg["concorrencia"], videos_por_item)
 
         status = banco_conteudo.finalizar_extracao(con, extracao_id, erros)
         tot = con.execute("SELECT total_aulas, total_blocos FROM extracoes WHERE id=?",
                           (extracao_id,)).fetchone()
         print(f"[4/4] Coleta {status}: {tot[0]} aulas, {tot[1]} blocos"
               + (f" | {len(erros)} aulas com erro (retomável com --continuar)" if erros else ""))
+        if com_videos and tarefas:
+            _emitir_videos(cfg, termo, os.path.dirname(os.path.abspath(caminho_banco)),
+                           tarefas, videos_por_item)
         return extracao_id
     finally:
         con.close()

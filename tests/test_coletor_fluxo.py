@@ -97,6 +97,18 @@ class TestColetar(unittest.TestCase):
         with self.assertRaises(SystemExit):
             coletor_ldi.coletar(CFG, SessaoFake(), "BACEN", self.db, continuar=True)
 
+    def test_com_videos_emite_arquivo_classico(self):
+        cfg = dict(CFG, pasta_saida=self.dir.name, incluir_url=False)
+        coletor_ldi.coletar(cfg, SessaoFake(), "BACEN", self.db, com_videos=True)
+        import glob
+        arquivos = glob.glob(os.path.join(self.dir.name, "videos_BACEN_*.json"))
+        self.assertEqual(len(arquivos), 1)
+        with open(arquivos[0], encoding="utf-8") as f:
+            linhas = json.load(f)
+        # i1 e i2 não têm vídeo -> viram linhas "aula sem bloco de video"
+        self.assertEqual(len(linhas), 2)
+        self.assertTrue(all("curso_nome" in l and "video_id_antigo" in l for l in linhas))
+
 
 if __name__ == "__main__":
     unittest.main()
