@@ -187,6 +187,15 @@ def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False
                           (extracao_id,)).fetchone()
         print(f"[4/4] Coleta {status}: {tot[0]} aulas, {tot[1]} blocos"
               + (f" | {len(erros)} aulas com erro (retomável com --continuar)" if erros else ""))
+        try:
+            import regras_qualidade
+            print("      avaliando regras de qualidade...")
+            r = regras_qualidade.avaliar(con, extracao_id,
+                                         depara=regras_qualidade.carregar_depara())
+            print(f"      pendências: {r['novas']} novas, {r['reabertas']} reabertas, "
+                  f"{r['resolvidas']} resolvidas")
+        except Exception as e:
+            print(f"      (regras de qualidade falharam: {e} — rode py regras_qualidade.py)")
         if com_videos and tarefas:
             _emitir_videos(cfg, termo, os.path.dirname(os.path.abspath(caminho_banco)),
                            tarefas, videos_por_item)
