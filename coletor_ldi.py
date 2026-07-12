@@ -196,6 +196,19 @@ def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False
                   f"{r['resolvidas']} resolvidas")
         except Exception as e:
             print(f"      (regras de qualidade falharam: {e} — rode py regras_qualidade.py)")
+        try:
+            import sync_supabase
+            if sync_supabase.esta_configurado():
+                print("      publicando no Supabase...")
+                rows = sync_supabase.montar_payload(con)
+                if rows:
+                    sid = sync_supabase.enviar(rows)
+                    print(f"      Supabase: snapshot {sid} publicado.")
+            else:
+                print("      (Supabase não configurado — pulei o sync; "
+                      "rode py sync_supabase.py quando quiser)")
+        except Exception as e:  # publicação não pode derrubar a coleta já gravada
+            print(f"      (sync com Supabase falhou: {e} — rode py sync_supabase.py)")
         if com_videos and tarefas:
             _emitir_videos(cfg, termo, os.path.dirname(os.path.abspath(caminho_banco)),
                            tarefas, videos_por_item)

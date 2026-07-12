@@ -4,6 +4,7 @@ cookies.txt
 metabase_cookie.txt
 metabase_cookies.json
 *.cookie
+supabase.json
 
 # ===== Dados e estado gerados em runtime =====
 saida/
