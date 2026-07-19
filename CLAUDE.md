@@ -15,8 +15,8 @@ propostas de substituição. Idioma do projeto: **pt-BR** (código, docs, UI e m
 
 ## Comandos
 
-Não há build, lint nem testes automatizados — são 3 scripts Python standalone (Python 3.12,
-deps: `requests` + `flask`). Sem git.
+O lado Python são scripts standalone (Python 3.12, deps: `requests` + `flask`); o app web
+fica em `web\` (Next.js 15, Node 22+).
 
 ```powershell
 # Ciclo completo (nesta ordem):
@@ -32,6 +32,12 @@ py regras_qualidade.py [--extracao N]              # motor de pendências avulso
 py painel.py [--sem-navegador]                     # painel em http://127.0.0.1:8766
 #   / = inventário · /avaliacao = planilha de avaliação por disciplina (CSV/print)
 py -m unittest discover -s tests                   # testes (parse, banco, coletor, regras, painel)
+
+# Publicação web (Supabase + Vercel):
+py sync_supabase.py [--termo X]                    # publica o snapshot mais recente no Supabase
+#   (também roda sozinho, não-fatal, ao fim de cada coleta do coletor_ldi.py)
+cd web; npm run dev                                # app web local em http://localhost:3000
+cd web; npm run build                              # build de produção (mesmo do Vercel)
 ```
 
 Os `.bat` (`_iniciar_extrator.bat`, `_depara_metabase.bat`, `_abrir_visualizador.bat`) só
@@ -85,6 +91,30 @@ Fonte do estoque de professores (sugestão automática): preferencial são as á
 `saida\estoque_arvores.json.gz`, leitura 100% read-only da pasta); a question 19885 fica só
 de cobertura para professores sem xlsx.
 
+### Publicação web (`web\` — Supabase + Vercel)
+
+O Painel de Conteúdo tem uma vitrine web de **leitura** para o time: `sync_supabase.py`
+roda a agregação do `painel.py` sobre o `conteudo.db` e faz upsert do resultado pronto em
+3 tabelas do Supabase (`snapshot`/`avaliacao_curso`/`pendencia_resumo` + view
+`snapshot_atual`, só `pronto=true`; schema versionado em `supabase\schema.sql`, RLS leitura
+`authenticated`). O app Next.js em `web\` (deploy no Vercel, Root Directory `web`) serve as
+telas com login **magic-link por convite** (Supabase Auth, sessão em cookie via
+`@supabase/ssr`, middleware gate). As telas web `web\telas\{painel,avaliacao}.html` são
+**cópias** das da raiz com 3 edições cada (link sair, selo de frescor, estado vazio) —
+mudou a tela da raiz, replicar na cópia. As telas chamam `/api/...` (handlers Next com o
+JWT do usuário — NÃO usar supabase-js no navegador: sessão em localStorage é incompatível
+com o gate por cookie). Nunca usar a service_role no `web\`.
+
+- **Supabase**: projeto na conta **Estratégia** (ref `zpjsoidxhfwziprjxpqx`) — NUNCA o
+  Supabase pessoal do Luiz. Credenciais: `supabase.json` na raiz (service_role, só para o
+  sync Python) e `web\.env.local` (anon key) — ambos gitignored.
+- **E-mail do magic link**: o remetente embutido do Supabase é só para dev (rate limit).
+  Para o time, plugar SMTP próprio em Auth → SMTP Settings — o Luiz tem **Resend** integrado
+  na infosab (outro projeto dele); reusar essa conta/API key.
+- **Git flow**: `main` = produção (deploy Vercel) · `develop` = integração/amadurecimento
+  (a plataforma tende a crescer — meta do Luiz: unificar todas as extrações do LDI) ·
+  `feat/*` = trabalho. Push exige login interativo do Luiz (deixar o comando pronto).
+
 ### Dois cookies, dois sistemas
 
 - **LDI (admin)**: `cookie.txt` na pasta — só o `__Secure-SID` importa (JWT, ~30 dias).
@@ -122,3 +152,5 @@ de cobertura para professores sem xlsx.
 | `saida\videos_<termo>_<data>.{json,csv}` | Resultado da extração (enriquecido in-place pelo de→para) |
 | `saida\conteudo.db` | Base SQLite do Painel de Conteúdo (snapshots de TODOS os blocos por concurso) |
 | `saida\metabase_depara.json.gz` / `saida\estoque_arvores.json.gz` | Caches (question 19885 / árvores xlsx) |
+| `supabase.json` | URL + service_role do Supabase (usado só pelo `sync_supabase.py`) |
+| `web\.env.local` | URL + anon key do Supabase para o app web local |
