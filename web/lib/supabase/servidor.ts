@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 // Cliente Supabase para route handlers e server actions.
@@ -13,10 +13,10 @@ export async function criarClienteServidor() {
         getAll() {
           return jarra.getAll();
         },
-        setAll(aGravar: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
+        setAll(aGravar: { name: string; value: string; options: CookieOptions }[]) {
           try {
             aGravar.forEach(({ name, value, options }) =>
-              jarra.set(name, value, options as Parameters<typeof jarra.set>[2])
+              jarra.set(name, value, options)
             );
           } catch {
             // Chamado de um Server Component: o middleware renova a sessão.

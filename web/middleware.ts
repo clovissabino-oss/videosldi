@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Gate: sem sessão -> /login. Também renova o token expirado (setAll).
@@ -13,11 +13,11 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(aGravar: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
+        setAll(aGravar: { name: string; value: string; options: CookieOptions }[]) {
           aGravar.forEach(({ name, value }) => request.cookies.set(name, value));
           resposta = NextResponse.next({ request });
           aGravar.forEach(({ name, value, options }) =>
-            resposta.cookies.set(name, value, options as Parameters<typeof resposta.cookies.set>[2])
+            resposta.cookies.set(name, value, options)
           );
         },
       },
