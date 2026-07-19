@@ -247,6 +247,32 @@ login interativo); (b) **app Next.js no Vercel** — login Supabase Auth magic-l
 telas lendo `snapshot_atual`/`avaliacao_curso`/`pendencia_resumo` (o payload já vem
 mastigado do sync; o front só renderiza o mesmo `{data: ...}` do painel local).
 
+## ✅ Sessão 8 (19/07): app web construído (falta só a config manual)
+
+Plano executado com subagentes (implementador + revisor por task, 2 fixes de revisão):
+`docs\superpowers\plans\2026-07-19-app-web-vercel.md`. **App Next.js completo em `web\`**
+(subpasta deste repo; Vercel com Root Directory = `web`):
+
+- **Auth**: login magic-link por convite (`shouldCreateUser:false`), sessão em cookie via
+  `@supabase/ssr`, middleware gate (sem sessão → `/login`), `/auth/confirm` (token_hash) e
+  `/auth/sair`.
+- **Desvio consciente do spec**: em vez de `supabase-js` direto no navegador (sessão em
+  localStorage, incompatível com o gate por cookie), as telas continuam chamando `/api/...`
+  e handlers Next consultam o Supabase com o JWT do usuário (RLS `authenticated` vale igual).
+  Telas com **zero mudança de fetch**.
+- **Telas**: `web\telas\{painel,avaliacao}.html` = cópias das da raiz + 3 edições cada
+  (link sair, selo "Dados de DD/MM HH:MM", estado vazio). **As telas da raiz não mudaram**
+  (byte-idênticas fora das edições — verificado com diff na revisão). Rota `/` injeta
+  `__DADOS__` como o Flask; `/avaliacao` consome `/api/cursos` + `/api/avaliacao`.
+- Build limpo, gate verificado por curl (307 → /login). `.env.local` gitignored
+  (anon key placeholder até o Luiz colar a real).
+
+**⚠ Para o app entrar no ar falta SÓ a config manual (Task 5 do plano):** anon key no
+`.env.local`, Dashboard Auth (desligar signup, 2 templates de e-mail com token_hash,
+convidar e-mails, Site URL/Redirect URLs), projeto Vercel (Root Directory `web`, Node 22+,
+2 env vars) e a verificação de paridade dos números contra o painel local (critério de
+aceite). Checklist detalhado na Task 5 do plano.
+
 ---
 
 ## 🔑 Coisas que a próxima sessão PRECISA saber
