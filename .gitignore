@@ -1,5 +1,6 @@
 # ===== Segredos / credenciais (NUNCA versionar) =====
 cookie.txt
+cookie.*.txt
 cookies.txt
 metabase_cookie.txt
 metabase_cookies.json

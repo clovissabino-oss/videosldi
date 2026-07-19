@@ -1,6 +1,6 @@
 # 🎬 Extrator LDI — Estado atual (norte da próxima sessão)
 
-_Última atualização: 07/07/2026 (sessão 6: fase 2 — planilha de Avaliação + motor de qualidade + coletor v1.1)._
+_Última atualização: 19/07/2026 (sessão 7: publicação web — Supabase no ar com o snapshot do BACEN)._
 
 Este arquivo é o **ponto de partida** de qualquer nova sessão. Para o passo a passo
 de uso, veja o `TUTORIAL.md`. Para a visão do projeto, a memória do Claude
@@ -215,6 +215,37 @@ C1 21). `/avaliacao` do Direito Penal bate com o mockup aprovado.
   o dado; falta a tela. Investigar também o `block_type_count` da árvore (conta versões:
   163 vs 53 no Direito Penal) e o capítulo vazio ("24. Crimes..." com 0 aulas) que a tela expôs.
 - Coletas antigas (snapshot #1) não têm banca/questões-texto (colunas NULL) — normal.
+
+## ✅ Sessão 7 (12–19/07): publicação web — fundação Supabase NO AR
+
+Decisão do Luiz: publicar o Painel de Conteúdo como **app web de leitura para o time**
+(Supabase = fonte, Vercel = vitrine; a coleta continua local). Spec aprovado:
+`docs\superpowers\specs\2026-07-12-publicacao-web-supabase-vercel-design.md`; plano:
+`docs\superpowers\plans\2026-07-12-fundacao-dados-nuvem-supabase.md`.
+
+**Construído (branch `feat/publicacao-web-supabase-vercel`, TDD, 43 testes verdes):**
+- `supabase/schema.sql` — tabelas `snapshot`/`avaliacao_curso`/`pendencia_resumo` +
+  view `snapshot_atual` (só `pronto=true`) + RLS (leitura `authenticated`, escrita só
+  `service_role`). Idempotente.
+- `sync_supabase.py` — reusa a agregação do `painel.py` (zero divergência com a tela)
+  e faz upsert atômico via PostgREST (snapshot só vira `pronto` no final).
+- Gancho não-fatal no `coletor_ldi.py`: publica ao fim de cada coleta.
+
+**✅ Verificado com dados reais (18-19/07):** projeto Supabase criado na **conta da
+Estratégia** (ref `zpjsoidxhfwziprjxpqx` — NUNCA usar o Supabase pessoal do Luiz),
+schema aplicado via Management API, `py sync_supabase.py` publicou o snapshot #2 do
+BACEN: **107 cursos em `avaliacao_curso`, 7 linhas de pendência, `pronto=true`**.
+Sem credencial → 401 (RLS ok).
+
+**Credenciais:** `supabase.json` na raiz (gitignored) com `{url, service_key}` —
+se sumir de novo, pegar no Dashboard da conta Estratégia → Settings → API. O access
+token `sbp_...` usado para aplicar o schema pode (deve) ser revogado — o sync do dia
+a dia só precisa de URL + service_role.
+
+**⚠ Próximos passos da sessão 8:** (a) push da branch (7+ commits locais; o Luiz faz o
+login interativo); (b) **app Next.js no Vercel** — login Supabase Auth magic-link +
+telas lendo `snapshot_atual`/`avaliacao_curso`/`pendencia_resumo` (o payload já vem
+mastigado do sync; o front só renderiza o mesmo `{data: ...}` do painel local).
 
 ---
 
