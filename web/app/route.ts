@@ -32,7 +32,7 @@ export async function GET() {
   const dados = { ...snap.resumo, sincronizado_em: snap.sincronizado_em };
   // < evita fechar o <script> se algum nome de curso tiver "</"
   const json = JSON.stringify(dados).replace(/</g, "\\u003c");
-  return new NextResponse(html.replace("__DADOS__", json), {
+  return new NextResponse(html.replace("__DADOS__", () => json), {
     headers: { "content-type": "text/html; charset=utf-8" },
   });
 }
