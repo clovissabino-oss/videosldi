@@ -9,7 +9,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const cursoId = new URL(request.url).searchParams.get("curso_id") ?? "";
   const supabase = await criarClienteServidor();
-  const snap = await snapshotAtual(supabase);
+  let snap;
+  try {
+    snap = await snapshotAtual(supabase);
+  } catch (e) {
+    const erro = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ data: null, erro }, { status: 500 });
+  }
   if (!snap) return NextResponse.json({ data: null });
 
   const { data, error } = await supabase

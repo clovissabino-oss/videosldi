@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 // + sincronizado_em para o selo de frescor da tela.
 export async function GET() {
   const supabase = await criarClienteServidor();
-  const snap = await snapshotAtual(supabase);
+  let snap;
+  try {
+    snap = await snapshotAtual(supabase);
+  } catch (e) {
+    const erro = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ data: null, erro }, { status: 500 });
+  }
   if (!snap) return NextResponse.json({ data: [], sincronizado_em: null });
 
   const { data, error } = await supabase
