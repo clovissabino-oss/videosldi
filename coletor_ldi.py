@@ -36,6 +36,28 @@ except Exception:
     pass
 
 
+_UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
+def extrair_ids(texto):
+    """Aceita UUIDs soltos e/ou URLs do admin (…?id=<uuid>&team_id=…),
+    separados por vírgula/espaço/linha. Pega SEMPRE o id= (nunca o team_id=).
+    Devolve a lista de UUIDs em minúsculas; levanta se algum token não tiver ID."""
+    ids = []
+    for tok in re.split(r"[\s,]+", (texto or "").strip()):
+        if not tok:
+            continue
+        m = re.search(rf"[?&]id=({_UUID})", tok)
+        if m:
+            ids.append(m.group(1).lower())
+        elif re.fullmatch(_UUID, tok):
+            ids.append(tok.lower())
+        else:
+            raise extrator_ldi.falha(f"Não achei um ID de curso em: {tok[:60]}")
+    if not ids:
+        raise extrator_ldi.falha("Nenhum ID de curso informado.")
+    return ids
+
+
 class CookieVencido(SystemExit):
     pass
 
@@ -142,7 +164,7 @@ def _emitir_videos(cfg, termo, pasta, tarefas, videos_por_item):
     print(f"      vídeos clássico: {base}.json/.csv")
 
 
-def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False):
+def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False, ids=None):
     con = banco_conteudo.abrir(caminho_banco)
     try:
         tarefas, videos_por_item = [], ({} if com_videos else None)
@@ -154,13 +176,19 @@ def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False
             extracao_id = ext["id"]
             print(f"[1/4] Retomando a coleta #{extracao_id} de \"{termo}\"...")
         else:
-            print(f"[1/4] Buscando cursos com \"{termo}\"...")
-            cursos = extrator_ldi.listar_cursos(sessao, termo)
-            if cfg.get("filtro_local"):
-                rx = re.compile(cfg["filtro_local"], re.I)
-                cursos = [c for c in cursos if rx.search(c.get("name") or "")]
-            if not cursos:
-                raise extrator_ldi.falha("Nenhum curso encontrado — confira o termo.")
+            if ids:
+                print(f"[1/4] Buscando {len(ids)} curso(s) por ID (rótulo \"{termo}\")...")
+                cursos = [c for c in (extrator_ldi.obter_curso(sessao, i) for i in ids) if c]
+                if not cursos:
+                    raise extrator_ldi.falha("Nenhum curso encontrado para as IDs informadas.")
+            else:
+                print(f"[1/4] Buscando cursos com \"{termo}\"...")
+                cursos = extrator_ldi.listar_cursos(sessao, termo)
+                if cfg.get("filtro_local"):
+                    rx = re.compile(cfg["filtro_local"], re.I)
+                    cursos = [c for c in cursos if rx.search(c.get("name") or "")]
+                if not cursos:
+                    raise extrator_ldi.falha("Nenhum curso encontrado — confira o termo.")
             extracao_id = banco_conteudo.iniciar_extracao(con, termo, cfg["vertical"])
             n_cursos, n_aulas = banco_conteudo.gravar_arvore(con, extracao_id, cursos)
             print(f"      {n_cursos} cursos, {n_aulas} aulas únicas (snapshot #{extracao_id})")
@@ -221,6 +249,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="Coletor LDI — conteúdo completo por concurso (somente leitura)")
     parser.add_argument("--termo", help="termo de busca (sobrepõe o config.json)")
+    parser.add_argument("--ids", help="coleta cursos por ID do LDI (UUIDs ou URLs do admin, "
+                                      "separados por vírgula/espaço); exige --rotulo")
+    parser.add_argument("--rotulo", help="nome do concurso sob o qual as --ids aparecem no "
+                                         "app (vira o 'termo' do snapshot)")
     parser.add_argument("--continuar", action="store_true",
                         help="retoma a coleta interrompida/parcial mais recente do termo")
     parser.add_argument("--com-videos", action="store_true",
@@ -229,10 +261,20 @@ def main():
     args = parser.parse_args()
 
     cfg = extrator_ldi.carregar_config()
-    termo = args.termo or cfg["termo_busca"]
     if args.continuar and args.com_videos:
         raise extrator_ldi.falha("--com-videos não funciona com --continuar "
                                  "(rode uma coleta nova).")
+    if args.ids:
+        if not args.rotulo:
+            raise extrator_ldi.falha("--ids exige --rotulo (o nome do concurso no app).")
+        if args.continuar:
+            raise extrator_ldi.falha("--ids não combina com --continuar "
+                                     "(para retomar, use --termo \"<rótulo>\" --continuar).")
+        ids = extrair_ids(args.ids)
+        termo = args.rotulo
+    else:
+        ids = None
+        termo = args.termo or cfg["termo_busca"]
     sessao = extrator_ldi.montar_sessao(cfg, extrator_ldi.carregar_cookie())
     caminho = os.path.join(extrator_ldi.PASTA_APP, cfg["pasta_saida"], "conteudo.db")
 
@@ -240,7 +282,7 @@ def main():
     print(f" COLETOR LDI  |  termo: {termo}  |  banco: {caminho}")
     print("=" * 60)
     coletar(cfg, sessao, termo, caminho,
-            continuar=args.continuar, com_videos=args.com_videos)
+            continuar=args.continuar, com_videos=args.com_videos, ids=ids)
     if not args.agendado:
         input("\nPressione ENTER para fechar...")
 
