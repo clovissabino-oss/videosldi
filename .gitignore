@@ -1,9 +1,11 @@
 # ===== Segredos / credenciais (NUNCA versionar) =====
 cookie.txt
+cookie.*.txt
 cookies.txt
 metabase_cookie.txt
 metabase_cookies.json
 *.cookie
+supabase.json
 
 # ===== Dados e estado gerados em runtime =====
 saida/

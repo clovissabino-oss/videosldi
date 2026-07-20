@@ -15,14 +15,29 @@ propostas de substituição. Idioma do projeto: **pt-BR** (código, docs, UI e m
 
 ## Comandos
 
-Não há build, lint nem testes automatizados — são 3 scripts Python standalone (Python 3.12,
-deps: `requests` + `flask`). Sem git.
+O lado Python são scripts standalone (Python 3.12, deps: `requests` + `flask`); o app web
+fica em `web\` (Next.js 15, Node 22+).
 
 ```powershell
 # Ciclo completo (nesta ordem):
 py extrator_ldi.py [--termo PRF] [--agendado]      # 1. extrai árvore do admin LDI → saida\videos_*.{csv,json}
 py depara_metabase.py [--arquivo X.json] [--refresh]  # 2. cruza com Metabase (data real de gravação)
 py visualizador.py [--sem-navegador]               # 3. tela analítica Flask em http://127.0.0.1:8765
+
+# Painel de Conteúdo (fase 2 — specs/planos em docs\superpowers\):
+py coletor_ldi.py [--termo X] [--continuar] [--com-videos] [--agendado]
+#   varre TODOS os blocos (questões c/ banca-ano, textos c/ questões coladas, PDFs, vídeos,
+#   professores) → snapshots em saida\conteudo.db; ao final roda as regras de qualidade
+py regras_qualidade.py [--extracao N]              # motor de pendências avulso (baixa automática)
+py painel.py [--sem-navegador]                     # painel em http://127.0.0.1:8766
+#   / = inventário · /avaliacao = planilha de avaliação por disciplina (CSV/print)
+py -m unittest discover -s tests                   # testes (parse, banco, coletor, regras, painel)
+
+# Publicação web (Supabase + Vercel):
+py sync_supabase.py [--termo X]                    # publica o snapshot mais recente no Supabase
+#   (também roda sozinho, não-fatal, ao fim de cada coleta do coletor_ldi.py)
+cd web; npm run dev                                # app web local em http://localhost:3000
+cd web; npm run build                              # build de produção (mesmo do Vercel)
 ```
 
 Os `.bat` (`_iniciar_extrator.bat`, `_depara_metabase.bat`, `_abrir_visualizador.bat`) só
@@ -53,6 +68,16 @@ Pipeline de 3 etapas, cada uma um script independente que se comunica pelos arqu
    `gravacao_*`, `mb_*`, `depara_ok`, `depara_confere`. A auth do Metabase é **reutilizada do
    app de Limpeza** (importa `experimento_metabase` de
    `C:\⚙️ Aplicativos\🦉 Relatório de Cursos - Árvores - Professores\6. Limpeza Unificada de Dados`).
+Além do pipeline de vídeos, existe o **Painel de Conteúdo** (`coletor_ldi.py` +
+`parse_blocos.py` + `banco_conteudo.py` + `regras_qualidade.py` + `painel.py`): o coletor
+varre TODOS os blocos de um concurso (questões com banca/ano/tópicos/soluções, textos com
+detector de questões coladas, vídeos com ID antigo, professores via detalhe do curso) e grava
+snapshots em `saida\conteudo.db` (SQLite WAL, retomável). Ao fim de cada coleta, o motor de
+qualidade materializa `pendencias` (catálogo declarativo, chave determinística, baixa
+automática no snapshot seguinte). O `painel.py` (porta 8766, `painel.html`/`avaliacao.html`
+embutidas no exe) serve o inventário e a planilha de Avaliação por disciplina (a idade real
+de gravação vem do cache `metabase_depara.json.gz`). Specs/planos em `docs\superpowers\`.
+
 3. **`visualizador.py` + `ui.html`** — servidor Flask (porta 8765) que serve a `ui.html`
    (single-file, ~100 KB, todo o front em JS vanilla inline) e expõe a API local:
    `/api/dados` (extração mais recente), `/api/cookie*`, `/api/analises` (→ `analises.json`),
@@ -65,6 +90,34 @@ Fonte do estoque de professores (sugestão automática): preferencial são as á
 `arvore_*.xlsx` da pasta da Limpeza (todos os caminhos por vídeo; cache próprio em
 `saida\estoque_arvores.json.gz`, leitura 100% read-only da pasta); a question 19885 fica só
 de cobertura para professores sem xlsx.
+
+### Publicação web (`web\` — Supabase + Vercel)
+
+O Painel de Conteúdo tem uma vitrine web de **leitura** para o time: `sync_supabase.py`
+roda a agregação do `painel.py` sobre o `conteudo.db` e faz upsert do resultado pronto em
+3 tabelas do Supabase (`snapshot`/`avaliacao_curso`/`pendencia_resumo` + view
+`snapshot_atual`, só `pronto=true`; schema versionado em `supabase\schema.sql`, RLS leitura
+`authenticated`). O app Next.js em `web\` (deploy no Vercel, Root Directory `web`) serve as
+telas com login **magic-link por convite** (Supabase Auth, sessão em cookie via
+`@supabase/ssr`, middleware gate). As telas web `web\telas\{painel,avaliacao}.html` são
+**cópias** das da raiz com 3 edições cada (link sair, selo de frescor, estado vazio) —
+mudou a tela da raiz, replicar na cópia. As telas chamam `/api/...` (handlers Next com o
+JWT do usuário — NÃO usar supabase-js no navegador: sessão em localStorage é incompatível
+com o gate por cookie). Service_role no app: só no módulo server-only
+`web\lib\supabase\admin.ts` (env `SUPABASE_SERVICE_KEY`, sem NEXT_PUBLIC_) — nunca em
+componente cliente/navegador. Acesso: @estrategia.com entra direto pelo login (auto-
+provisionado); externos por convite na tela `/admin` (admin = `app_metadata.role="admin"`;
+hoje só o Luiz).
+
+- **Supabase**: projeto na conta **Estratégia** (ref `zpjsoidxhfwziprjxpqx`) — NUNCA o
+  Supabase pessoal do Luiz. Credenciais: `supabase.json` na raiz (service_role, só para o
+  sync Python) e `web\.env.local` (anon key) — ambos gitignored.
+- **E-mail do magic link**: o remetente embutido do Supabase é só para dev (rate limit).
+  Para o time, plugar SMTP próprio em Auth → SMTP Settings — o Luiz tem **Resend** integrado
+  na infosab (outro projeto dele); reusar essa conta/API key.
+- **Git flow**: `main` = produção (deploy Vercel) · `develop` = integração/amadurecimento
+  (a plataforma tende a crescer — meta do Luiz: unificar todas as extrações do LDI) ·
+  `feat/*` = trabalho. Push exige login interativo do Luiz (deixar o comando pronto).
 
 ### Dois cookies, dois sistemas
 
@@ -101,4 +154,7 @@ de cobertura para professores sem xlsx.
 | `cookie.txt` | Cookie do admin LDI |
 | `analises.json` / `propostas.json` | Estado salvo pela tela (análises nomeadas / propostas de substituição) |
 | `saida\videos_<termo>_<data>.{json,csv}` | Resultado da extração (enriquecido in-place pelo de→para) |
+| `saida\conteudo.db` | Base SQLite do Painel de Conteúdo (snapshots de TODOS os blocos por concurso) |
 | `saida\metabase_depara.json.gz` / `saida\estoque_arvores.json.gz` | Caches (question 19885 / árvores xlsx) |
+| `supabase.json` | URL + service_role do Supabase (usado só pelo `sync_supabase.py`) |
+| `web\.env.local` | URL + anon key do Supabase para o app web local |
