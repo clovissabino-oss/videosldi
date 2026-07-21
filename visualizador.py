@@ -13,7 +13,6 @@
        py visualizador.py --sem-navegador
 ============================================================
 """
-import base64
 import glob
 import gzip
 import json
