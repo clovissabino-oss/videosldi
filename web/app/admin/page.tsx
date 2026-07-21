@@ -4,6 +4,7 @@ import { exigirAdmin } from "../../lib/papeis";
 import { convidarUsuario, atualizarCookie } from "./actions";
 import { FormRemover } from "./form-remover";
 import { FormPapel } from "./form-papel";
+import { BannerCookie } from "../../components/BannerCookie";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,9 @@ export default async function PaginaAdmin({
         {" "}Painel de Conteúdo · administração de acesso
       </p>
       <h1 style={{ fontSize: 21, fontWeight: 650, margin: "0 0 4px" }}>Usuários</h1>
+
+      <BannerCookie />
+
       <p style={{ color: "#52514e", fontSize: 13, margin: "0 0 16px" }}>
         @estrategia.com entra sozinho pelo login. Convide aqui apenas e-mails externos.
       </p>
