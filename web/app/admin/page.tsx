@@ -1,18 +1,33 @@
-import { notFound } from "next/navigation";
 import { listarUsuarios, criarClienteAdmin } from "../../lib/supabase/admin";
 import { criarClienteServidor } from "../../lib/supabase/servidor";
-import { convidarUsuario } from "./actions";
+import { exigirAdmin } from "../../lib/papeis";
+import { convidarUsuario, atualizarCookie } from "./actions";
 import { FormRemover } from "./form-remover";
+import { FormPapel } from "./form-papel";
+import { BannerCookie } from "../../components/BannerCookie";
 
 export const dynamic = "force-dynamic";
+
+interface StatusCookie {
+  email: string | null;
+  expira_em: string | null;
+  dias_restantes: number | null;
+  valido: boolean;
+  atualizado_em: string | null;
+}
 
 const MENSAGENS: Record<string, (email?: string) => string> = {
   email: () => "Informe um e-mail válido.",
   dominio: () => "ℹ Esse e-mail é @estrategia.com — entra direto pelo login, sem convite.",
   erro: () => "❌ Não foi possível concluir — tente de novo.",
   proprio: () => "⚠ Você não pode remover a si mesmo.",
+  "proprio-papel": () => "⚠ Você não pode alterar o próprio papel.",
   convidado: (e) => `✅ Convite enviado para ${e ?? "o e-mail"}.`,
   removido: (e) => `✅ Acesso de ${e ?? "usuário"} removido.`,
+  "papel-definido": (e) => `✅ Papel de ${e ?? "usuário"} atualizado.`,
+  "cookie-vazio": () => "Cole o cookie antes de salvar.",
+  "cookie-erro": () => "❌ Não foi possível salvar o cookie — tente de novo.",
+  "cookie-ok": () => "✅ Cookie do LDI atualizado. O worker publica o status em instantes.",
 };
 
 // Data local do projeto: pt-BR com fuso explícito (servidor do Vercel é UTC).
@@ -31,13 +46,20 @@ export default async function PaginaAdmin({
 }) {
   const { msg, email } = await searchParams;
 
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.app_metadata?.role !== "admin") notFound();
+  const user = await exigirAdmin("notFound");
 
   const admin = criarClienteAdmin();
   const usuarios = await listarUsuarios(admin);
   usuarios.sort((a, b) => (a.email ?? "").localeCompare(b.email ?? "", "pt-BR"));
+
+  // Estado do cookie do LDI vem de cookie_status (publicado pelo worker) —
+  // nunca lemos config_ldi aqui (é onde o cookie de verdade fica).
+  const supabase = await criarClienteServidor();
+  const { data: statusCookie } = await supabase
+    .from("cookie_status")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle<StatusCookie>();
 
   return (
     <main
@@ -55,6 +77,9 @@ export default async function PaginaAdmin({
         {" "}Painel de Conteúdo · administração de acesso
       </p>
       <h1 style={{ fontSize: 21, fontWeight: 650, margin: "0 0 4px" }}>Usuários</h1>
+
+      <BannerCookie />
+
       <p style={{ color: "#52514e", fontSize: 13, margin: "0 0 16px" }}>
         @estrategia.com entra sozinho pelo login. Convide aqui apenas e-mails externos.
       </p>
@@ -102,7 +127,12 @@ export default async function PaginaAdmin({
                 {u.email}
               </td>
               <td style={{ padding: "8px 10px", borderBottom: "1px solid #e3e2dd" }}>
-                {u.app_metadata?.role === "admin" ? "admin" : "—"}
+                <FormPapel
+                  id={u.id}
+                  email={u.email ?? ""}
+                  papel={String(u.app_metadata?.role ?? "")}
+                  desabilitado={u.id === user.id}
+                />
               </td>
               <td style={{ padding: "8px 10px", borderBottom: "1px solid #e3e2dd" }}>
                 {u.email_confirmed_at ? "✅" : "📨 pendente"}
@@ -117,6 +147,51 @@ export default async function PaginaAdmin({
           ))}
         </tbody>
       </table>
+
+      <h2 style={{ fontSize: 17, fontWeight: 650, margin: "32px 0 4px" }}>
+        🍪 Cookie do LDI
+      </h2>
+      <p style={{ color: "#52514e", fontSize: 13, margin: "0 0 12px" }}>
+        Usado pelo worker de coleta para acessar o admin do LDI. Cole aqui um
+        <code style={{ margin: "0 4px" }}>__Secure-SID</code>
+        novo (o valor puro ou o cookie inteiro colado) quando vencer.
+      </p>
+
+      <p style={{ fontSize: 13, margin: "0 0 16px" }}>
+        {statusCookie ? (
+          <>
+            {statusCookie.valido ? "✅ válido" : "❌ vencido"}
+            {statusCookie.email ? ` · ${statusCookie.email}` : ""}
+            {statusCookie.dias_restantes != null
+              ? ` · ${Math.round(statusCookie.dias_restantes)} dia(s) restante(s)`
+              : ""}
+            {" · atualizado em "}
+            {dataLocal(statusCookie.atualizado_em ?? undefined)}
+          </>
+        ) : (
+          "Sem informação ainda (o worker publica ao rodar)."
+        )}
+      </p>
+
+      <form action={atualizarCookie} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <input
+          type="password" name="cookie" required placeholder="__Secure-SID=... (ou só o valor)"
+          style={{
+            flex: 1, font: "inherit", padding: "8px 11px",
+            border: "1px solid #e3e2dd", borderRadius: 8,
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            font: "inherit", fontWeight: 600, cursor: "pointer",
+            background: "#2a78d6", color: "#fff", border: 0, borderRadius: 8,
+            padding: "8px 16px",
+          }}
+        >
+          Atualizar cookie
+        </button>
+      </form>
     </main>
   );
 }

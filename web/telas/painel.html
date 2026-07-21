@@ -95,6 +95,28 @@
 </head>
 <body>
 <div class="wrap">
+  <!-- edição web: banner cookie -->
+  <div id="banner-cookie" hidden></div>
+  <script>
+  (function () {
+    fetch("/api/cookie-status").then(r => r.json()).then(({ data }) => {
+      if (!data) return;
+      const critico = !data.valido;
+      const perto = data.dias_restantes != null && data.dias_restantes <= 3;
+      if (!critico && !perto) return;
+      const el = document.getElementById("banner-cookie");
+      el.textContent = critico
+        ? "🍪 Cookie do LDI vencido — coletas estão paradas. Avise um administrador."
+        : `🍪 Cookie do LDI vence em ${Math.round(data.dias_restantes)} dia(s) — renove no /admin.`;
+      el.style.cssText = "margin:0 0 16px;padding:9px 13px;border-radius:8px;font-size:13px;" +
+        (critico
+          ? "color:var(--crit);border:1px solid var(--crit);background:var(--crit-bg)"
+          : "color:var(--warn);border:1px solid var(--warn);background:var(--warn-bg)");
+      el.hidden = false;
+    }).catch(() => {});
+  })();
+  </script>
+  <!-- fim edição web: banner cookie -->
   <p class="eyebrow">Painel de Conteúdo · Inventário
     &nbsp;·&nbsp; <a href="/avaliacao" style="color:inherit">📋 Avaliação de disciplina</a>
     <a href="/auth/sair" style="color:inherit;float:right">sair ↪</a></p>
