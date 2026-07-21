@@ -1,0 +1,15 @@
+[Unit]
+Description=Worker de coleta LDI (Painel de Conteudo)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/extrator-ldi
+ExecStart=/usr/bin/python3 worker_coleta.py
+Restart=always
+RestartSec=10
+User=extrator
+
+[Install]
+WantedBy=multi-user.target
