@@ -120,9 +120,9 @@ def processar_pedido(rest, key, row, cfg):
         _patch_pedido(rest, key, pid, {"status": "cancelada",
                                        "concluido_em": datetime.now(timezone.utc).isoformat()})
         return "cancelada"
-    except extrator_ldi.CookieVencido as e:
+    except coletor_ldi.CookieVencido as e:
         _patch_pedido(rest, key, pid, {"status": "aguardando_cookie", "mensagem": str(e)[:400]})
-        _publicar_cookie_status(rest, key, cookie)  # provavelmente valido=false após probe futuro
+        _publicar_cookie_status(rest, key, cookie)  # publica o status do cookie (agora inválido) para o banner
         enviar_email_cookie("Cookie do LDI caiu durante a coleta",
                             "<p>A coleta falhou com 401/403 — o cookie do LDI caiu. "
                             "Renove-o na tela de admin e use \"retentar\".</p>")
