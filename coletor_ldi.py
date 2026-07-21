@@ -62,8 +62,9 @@ def extrair_ids(texto):
     return ids
 
 
-class CookieVencido(SystemExit):
-    pass
+# A classe mora no extrator_ldi (onde está o get_json que detecta o 401);
+# o alias preserva a interface usada pelo worker e pelos testes.
+CookieVencido = extrator_ldi.CookieVencido
 
 
 def baixar_blocos(sessao, item_id, tentativa=1):

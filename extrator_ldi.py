@@ -52,6 +52,13 @@ def falha(msg):
     return SystemExit(1)
 
 
+class CookieVencido(SystemExit):
+    """401/403 — a sessão do cookie foi derrubada ou venceu. Subclasse de
+    SystemExit para os CLIs saírem limpo; o worker da fila captura esta classe
+    para marcar o pedido como aguardando_cookie (nunca 'erro' genérico)."""
+    pass
+
+
 def carregar_config():
     caminho = os.path.join(PASTA_APP, "config.json")
     if not os.path.exists(caminho):
@@ -104,8 +111,9 @@ def get_json(sessao, url, tentativa=1):
             return get_json(sessao, url, tentativa + 1)
         raise falha(f"Falha de rede repetida em {url}: {e}")
     if r.status_code == 401:
-        raise falha("A API respondeu 401 (não autenticado).\n"
-                    "       O cookie venceu — atualize o cookie.txt (TUTORIAL.md, seção 'Atualizar o cookie').")
+        print("\n[ERRO] A API respondeu 401 (não autenticado).\n"
+              "       O cookie venceu — atualize o cookie.txt (TUTORIAL.md, seção 'Atualizar o cookie').")
+        raise CookieVencido(1)
     if r.status_code == 429 or r.status_code >= 500:
         if tentativa < 4:
             time.sleep(0.7 * tentativa * tentativa)
