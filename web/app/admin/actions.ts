@@ -2,17 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { criarClienteAdmin } from "../../lib/supabase/admin";
-import { criarClienteServidor } from "../../lib/supabase/servidor";
+import { exigirAdmin } from "../../lib/papeis";
 
 const DOMINIO_APROVADO = "@estrategia.com";
-
-// Toda action re-checa o papel NO SERVIDOR — nunca confiar só na página.
-async function exigirAdmin() {
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.app_metadata?.role !== "admin") redirect("/login");
-  return user;
-}
+const PAPEIS_VALIDOS = ["", "operador", "admin"];
 
 export async function convidarUsuario(formData: FormData) {
   await exigirAdmin();
@@ -43,4 +36,23 @@ export async function removerUsuario(formData: FormData) {
     redirect("/admin?msg=erro");
   }
   redirect(`/admin?msg=removido&email=${encodeURIComponent(email)}`);
+}
+
+export async function definirPapel(formData: FormData) {
+  const eu = await exigirAdmin();
+  const id = String(formData.get("id") ?? "");
+  const email = String(formData.get("email") ?? "");
+  const papel = String(formData.get("papel") ?? "");
+  if (!id || !PAPEIS_VALIDOS.includes(papel)) redirect("/admin?msg=erro");
+  if (id === eu.id) redirect("/admin?msg=proprio-papel");
+
+  const admin = criarClienteAdmin();
+  const { error } = await admin.auth.admin.updateUserById(id, {
+    app_metadata: { role: papel || null },
+  });
+  if (error) {
+    console.error("[admin] definirPapel:", error.message);
+    redirect("/admin?msg=erro");
+  }
+  redirect(`/admin?msg=papel-definido&email=${encodeURIComponent(email)}`);
 }

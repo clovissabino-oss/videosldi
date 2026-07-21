@@ -1,8 +1,8 @@
-import { notFound } from "next/navigation";
 import { listarUsuarios, criarClienteAdmin } from "../../lib/supabase/admin";
-import { criarClienteServidor } from "../../lib/supabase/servidor";
+import { exigirAdmin } from "../../lib/papeis";
 import { convidarUsuario } from "./actions";
 import { FormRemover } from "./form-remover";
+import { FormPapel } from "./form-papel";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,10 @@ const MENSAGENS: Record<string, (email?: string) => string> = {
   dominio: () => "ℹ Esse e-mail é @estrategia.com — entra direto pelo login, sem convite.",
   erro: () => "❌ Não foi possível concluir — tente de novo.",
   proprio: () => "⚠ Você não pode remover a si mesmo.",
+  "proprio-papel": () => "⚠ Você não pode alterar o próprio papel.",
   convidado: (e) => `✅ Convite enviado para ${e ?? "o e-mail"}.`,
   removido: (e) => `✅ Acesso de ${e ?? "usuário"} removido.`,
+  "papel-definido": (e) => `✅ Papel de ${e ?? "usuário"} atualizado.`,
 };
 
 // Data local do projeto: pt-BR com fuso explícito (servidor do Vercel é UTC).
@@ -31,9 +33,7 @@ export default async function PaginaAdmin({
 }) {
   const { msg, email } = await searchParams;
 
-  const supabase = await criarClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.app_metadata?.role !== "admin") notFound();
+  const user = await exigirAdmin("notFound");
 
   const admin = criarClienteAdmin();
   const usuarios = await listarUsuarios(admin);
@@ -102,7 +102,12 @@ export default async function PaginaAdmin({
                 {u.email}
               </td>
               <td style={{ padding: "8px 10px", borderBottom: "1px solid #e3e2dd" }}>
-                {u.app_metadata?.role === "admin" ? "admin" : "—"}
+                <FormPapel
+                  id={u.id}
+                  email={u.email ?? ""}
+                  papel={String(u.app_metadata?.role ?? "")}
+                  desabilitado={u.id === user.id}
+                />
               </td>
               <td style={{ padding: "8px 10px", borderBottom: "1px solid #e3e2dd" }}>
                 {u.email_confirmed_at ? "✅" : "📨 pendente"}
