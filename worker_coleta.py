@@ -7,6 +7,10 @@
  honra cancelamento e avisa por e-mail (Resend) quando o
  cookie do LDI cai. Spec: docs/superpowers/specs/2026-07-20-*.
  Uso: py worker_coleta.py   (laço; Ctrl-C encerra)
+
+ Limitações conhecidas: o cancelamento só age na fase de download de
+ blocos e drena os downloads já enfileirados (não é instantâneo); as
+ fases de listar cursos/professores não checam cancelamento.
 ============================================================
 """
 import os
@@ -66,8 +70,10 @@ def _ler_cookie(rest, key):
     return (linhas[0]["cookie"] if linhas else None) or None
 
 
-def _publicar_cookie_status(rest, key, cookie):
+def _publicar_cookie_status(rest, key, cookie, forcar_invalido=False):
     r = cookie_status.resumo_validade(cookie or "")
+    if forcar_invalido:
+        r = {**r, "valido": False}
     corpo = {"id": 1, **r, "atualizado_em": datetime.now(timezone.utc).isoformat()}
     requests.post(f"{rest}/cookie_status",
                   headers=sync_supabase._headers(key, "resolution=merge-duplicates"),
@@ -83,11 +89,12 @@ def enviar_email_cookie(assunto, corpo_html):
     if not api or not para:
         print(f"[worker] (sem Resend/admin_email — não enviei) {assunto}")
         return
-    requests.post("https://api.resend.com/emails",
+    resp = requests.post("https://api.resend.com/emails",
                   headers={"Authorization": f"Bearer {api}", "Content-Type": "application/json"},
                   json={"from": "Painel de Conteúdo <painel@infosab.com.br>",
                         "to": [para], "subject": assunto, "html": corpo_html},
                   timeout=30)
+    print(f"[worker] e-mail cookie -> Resend {resp.status_code}")
 
 
 def processar_pedido(rest, key, row, cfg):
@@ -105,8 +112,12 @@ def processar_pedido(rest, key, row, cfg):
         return "aguardando_cookie"
 
     def progresso(feito, total):
-        _patch_pedido(rest, key, pid, {"progresso": f"{feito}/{total} aulas"})
-        if _status_pedido(rest, key, pid) == "cancelando":
+        try:
+            _patch_pedido(rest, key, pid, {"progresso": f"{feito}/{total} aulas"})
+            cancelar = _status_pedido(rest, key, pid) == "cancelando"
+        except Exception:
+            return  # blip de rede no Supabase não derruba a coleta em andamento
+        if cancelar:
             raise coletor_ldi.ColetaCancelada()
 
     try:
@@ -122,7 +133,7 @@ def processar_pedido(rest, key, row, cfg):
         return "cancelada"
     except coletor_ldi.CookieVencido as e:
         _patch_pedido(rest, key, pid, {"status": "aguardando_cookie", "mensagem": str(e)[:400]})
-        _publicar_cookie_status(rest, key, cookie)  # publica o status do cookie (agora inválido) para o banner
+        _publicar_cookie_status(rest, key, cookie, forcar_invalido=True)  # publica o status do cookie (agora inválido) para o banner
         enviar_email_cookie("Cookie do LDI caiu durante a coleta",
                             "<p>A coleta falhou com 401/403 — o cookie do LDI caiu. "
                             "Renove-o na tela de admin e use \"retentar\".</p>")
@@ -143,6 +154,17 @@ def main():
     cfg = extrator_ldi.carregar_config()
     rest, key = _rest()
     print(f"[worker] no ar. fila: {rest}/coleta_pedido  |  banco: {BANCO}")
+
+    # reconciliação: pedidos presos em rodando/cancelando (worker caiu) voltam à fila
+    try:
+        requests.patch(f"{rest}/coleta_pedido", headers=sync_supabase._headers(key),
+                       params={"status": "in.(rodando,cancelando)"},
+                       json={"status": "pendente",
+                             "mensagem": "reprocessado após reinício do worker"},
+                       timeout=30).raise_for_status()
+    except Exception as e:
+        print(f"[worker] reconciliação falhou (segue): {e}")
+
     while True:
         try:
             cookie = _ler_cookie(rest, key)

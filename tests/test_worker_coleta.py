@@ -76,8 +76,90 @@ class TestProcessarPedidoCookie(unittest.TestCase):
         call_args = mock_enviar_email.call_args
         self.assertIn("cookie", call_args[0][0].lower())
 
-        # Verificar que o cookie status foi publicado
+        # Verificar que o cookie status foi publicado com forcar_invalido=True
+        # (o banner não pode aparecer válido quando o cookie foi rejeitado pelo LDI)
         mock_publicar_status.assert_called_once()
+        call_args = mock_publicar_status.call_args
+        forcar_invalido = call_args.kwargs.get("forcar_invalido")
+        if forcar_invalido is None:
+            # aceita também posicional (4º argumento)
+            forcar_invalido = call_args.args[3] if len(call_args.args) > 3 else None
+        self.assertIs(forcar_invalido, True)
+
+
+class TestProgressoCallback(unittest.TestCase):
+    """Testa que o callback de progresso não derruba a coleta com um blip de rede
+    no Supabase, mas ainda honra o cancelamento quando a checagem tem sucesso."""
+
+    @patch("worker_coleta.coletor_ldi.coletar")
+    @patch("worker_coleta.extrator_ldi.montar_sessao")
+    @patch("worker_coleta._status_pedido")
+    @patch("worker_coleta._ler_cookie")
+    @patch("worker_coleta._patch_pedido")
+    def test_blip_de_rede_nao_propaga(
+        self, mock_patch, mock_ler_cookie, mock_status, mock_sessao, mock_coletar
+    ):
+        """_patch_pedido falhando (blip de rede) no callback de progresso não deve
+        derrubar a coleta — coletar() deve rodar até o fim normalmente."""
+        mock_ler_cookie.return_value = _cookie_valido()
+        mock_sessao.return_value = MagicMock()
+
+        # primeira chamada (status="rodando") ok; demais chamadas do callback falham
+        chamadas = {"n": 0}
+
+        def patch_lado(rest, key, pid, campos):
+            chamadas["n"] += 1
+            if "progresso" in campos:
+                raise Exception("conexão caiu")
+
+        mock_patch.side_effect = patch_lado
+
+        def coletar_chama_progresso(cfg, sessao, termo, banco, ids=None, progresso=None):
+            # simula o coletor chamando o callback de progresso — não deve levantar
+            progresso(1, 10)
+            return 999
+
+        mock_coletar.side_effect = coletar_chama_progresso
+
+        row = {"id": 42, "tipo": "termo", "alvo": "PRF", "rotulo": None}
+        cfg = {"vertical": "concursos"}
+        rest, key = "http://mock", "mock_key"
+
+        status = worker_coleta.processar_pedido(rest, key, row, cfg)
+
+        # o blip de rede no callback não deve ter feito a coleta virar 'erro';
+        # coletar() rodou até o fim e o pedido concluiu normalmente.
+        self.assertEqual(status, "concluida")
+        # _status_pedido não deve ter sido chamado, pois _patch_pedido já falhou antes
+        mock_status.assert_not_called()
+
+    @patch("worker_coleta.coletor_ldi.coletar")
+    @patch("worker_coleta.extrator_ldi.montar_sessao")
+    @patch("worker_coleta._status_pedido")
+    @patch("worker_coleta._ler_cookie")
+    @patch("worker_coleta._patch_pedido")
+    def test_cancelando_levanta_coleta_cancelada(
+        self, mock_patch, mock_ler_cookie, mock_status, mock_sessao, mock_coletar
+    ):
+        """Quando _status_pedido retorna 'cancelando' (sem blip de rede), o callback
+        de progresso deve levantar ColetaCancelada — e o pedido vira 'cancelada'."""
+        mock_ler_cookie.return_value = _cookie_valido()
+        mock_sessao.return_value = MagicMock()
+        mock_status.return_value = "cancelando"
+
+        def coletar_chama_progresso(cfg, sessao, termo, banco, ids=None, progresso=None):
+            progresso(1, 10)  # deve levantar ColetaCancelada
+            return 999  # não deve chegar aqui
+
+        mock_coletar.side_effect = coletar_chama_progresso
+
+        row = {"id": 43, "tipo": "termo", "alvo": "PRF", "rotulo": None}
+        cfg = {"vertical": "concursos"}
+        rest, key = "http://mock", "mock_key"
+
+        status = worker_coleta.processar_pedido(rest, key, row, cfg)
+
+        self.assertEqual(status, "cancelada")
 
 
 if __name__ == "__main__":
