@@ -33,6 +33,7 @@ from flask import Flask, jsonify, request, send_file
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import extrator_ldi as ex
 import config_util
+import cookie_status
 
 # PASTA_APP = onde ficam cookie.txt/config.json/saida (ao lado do .py ou do .exe)
 PASTA_APP = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -48,19 +49,7 @@ app = Flask(__name__)
 
 def _decodifica_sid(cookie_bruto):
     """Extrai validade/e-mail do token __Secure-SID (o único que a API exige)."""
-    m = re.search(r"__Secure-SID=([^;\s]+)", cookie_bruto)
-    if not m:
-        return {}
-    try:
-        payload = m.group(1).split(".")[1]
-        payload += "=" * (-len(payload) % 4)
-        j = json.loads(base64.urlsafe_b64decode(payload))
-        return {
-            "email": j.get("email", ""),
-            "expira_ts": j.get("exp"),
-        }
-    except Exception:
-        return {}
+    return cookie_status.decodifica_sid(cookie_bruto)
 
 
 def _status_cookie(probar=True):
