@@ -56,3 +56,37 @@ export async function definirPapel(formData: FormData) {
   }
   redirect(`/admin?msg=papel-definido&email=${encodeURIComponent(email)}`);
 }
+
+// Aceita o valor puro do __Secure-SID ou um trecho colado com
+// "__Secure-SID=<valor>" (cookie header inteiro ou só o par) — extrai só o valor.
+function sanearCookie(bruto: string): string {
+  const texto = bruto.trim();
+  const marcador = "__Secure-SID=";
+  const posicao = texto.indexOf(marcador);
+  if (posicao === -1) return texto;
+  const resto = texto.slice(posicao + marcador.length);
+  const fimValor = resto.indexOf(";");
+  return (fimValor === -1 ? resto : resto.slice(0, fimValor)).trim();
+}
+
+export async function atualizarCookie(formData: FormData) {
+  const user = await exigirAdmin();
+  const cookie = sanearCookie(String(formData.get("cookie") ?? ""));
+  if (!cookie) redirect("/admin?msg=cookie-vazio");
+
+  const admin = criarClienteAdmin();
+  const { error } = await admin.from("config_ldi").upsert(
+    {
+      id: 1,
+      cookie,
+      atualizado_em: new Date().toISOString(),
+      atualizado_por: user.email,
+    },
+    { onConflict: "id" }
+  );
+  if (error) {
+    console.error("[admin] atualizarCookie:", error.message);
+    redirect("/admin?msg=cookie-erro");
+  }
+  redirect("/admin?msg=cookie-ok");
+}
