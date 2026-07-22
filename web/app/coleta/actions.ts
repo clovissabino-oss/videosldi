@@ -4,6 +4,89 @@ import { redirect } from "next/navigation";
 import { criarClienteAdmin } from "../../lib/supabase/admin";
 import { exigirAdmin, exigirOperador } from "../../lib/papeis";
 import { extrairIds, enfileirar, mudarStatus } from "../../lib/coleta";
+import { buscarNomeCursoLdi } from "../../lib/ldi";
+
+const LIMITE_CONFERENCIA = 15;
+// pedidos "em jogo" para efeito de aviso de repetição — os demais (cancelada,
+// erro) não contam como "já coletado".
+const STATUS_JA_COLETADO = ["pendente", "rodando", "concluida"];
+
+export interface ItemConferencia {
+  id: string;
+  nome: string | null;
+  jaColetado: { rotulo: string | null; pedidoId: number; criadoEm: string } | null;
+}
+
+// Resolve o NOME real de cada ID colado (contra o LDI) e avisa se aquele
+// alvo já está/esteve na fila — checagem informativa ANTES de disparar
+// (incidente real: UUID repetido em 2 disparos com rótulos diferentes, só
+// percebido depois). NUNCA retorna nem loga o valor do cookie.
+export async function conferirIds(
+  texto: string
+): Promise<{ erro: string | null; itens: ItemConferencia[] }> {
+  await exigirOperador();
+
+  let ids: string[];
+  try {
+    ids = extrairIds(texto);
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : "IDs inválidos.", itens: [] };
+  }
+  if (ids.length > LIMITE_CONFERENCIA) {
+    return {
+      erro: `Confira no máximo ${LIMITE_CONFERENCIA} IDs por vez (colou ${ids.length}).`,
+      itens: [],
+    };
+  }
+
+  const admin = criarClienteAdmin();
+  const { data: config, error: erroConfig } = await admin
+    .from("config_ldi")
+    .select("cookie")
+    .eq("id", 1)
+    .maybeSingle<{ cookie: string | null }>();
+  if (erroConfig) {
+    console.error("[coleta] conferirIds (config_ldi):", erroConfig.message);
+    return { erro: "Não foi possível ler o cookie do LDI — tente de novo.", itens: [] };
+  }
+  const cookie = config?.cookie ?? null;
+  if (!cookie) {
+    return { erro: "Sem cookie do LDI configurado.", itens: [] };
+  }
+
+  const nomes = await Promise.all(ids.map((id) => buscarNomeCursoLdi(cookie, id)));
+  if (nomes.some((n) => n === "sem-acesso")) {
+    return {
+      erro: "O cookie do LDI está inválido — renove no bloco 🍪 acima.",
+      itens: [],
+    };
+  }
+
+  const itens: ItemConferencia[] = await Promise.all(
+    ids.map(async (id, i) => {
+      const { data: existente, error: erroExistente } = await admin
+        .from("coleta_pedido")
+        .select("id, rotulo, criado_em")
+        .ilike("alvo", `%${id}%`)
+        .in("status", STATUS_JA_COLETADO)
+        .order("criado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: number; rotulo: string | null; criado_em: string }>();
+      if (erroExistente) {
+        console.error("[coleta] conferirIds (coleta_pedido):", erroExistente.message);
+      }
+      return {
+        id,
+        nome: nomes[i] as string | null,
+        jaColetado: existente
+          ? { rotulo: existente.rotulo, pedidoId: existente.id, criadoEm: existente.criado_em }
+          : null,
+      };
+    })
+  );
+
+  return { erro: null, itens };
+}
 
 // Dispara uma coleta: modo "termo" (busca por termo, ex. "PRF") ou modo
 // "ids" (IDs/URLs colados do admin — exige rótulo para identificar o lote).

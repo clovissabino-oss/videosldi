@@ -47,6 +47,44 @@ export async function probarCookieLdi(sid: string): Promise<VereditoProbe> {
   }
 }
 
+const URL_CURSO = "https://api.estrategia.com/bo/ldi/courses";
+const TIMEOUT_CURSO_MS = 6000;
+
+// Busca o nome real do curso pelo ID (GET /bo/ldi/courses/{uuid}) — usado na
+// tela de coleta para o usuário conferir o que vai colar ANTES de disparar
+// (incidente real: UUID repetido em 2 disparos com rótulos diferentes, só
+// percebido depois). `sid` já é o par completo "__Secure-SID=<jwt>".
+// 200 → nome (ou null se a API não devolver `data`); 401/403 → "sem-acesso"
+// (cookie inválido — quem chama deve tratar como erro de bloco, não por
+// curso); qualquer outra coisa (rede, timeout, 404, 5xx) → null (curso não
+// encontrado / indeterminado).
+export async function buscarNomeCursoLdi(
+  sidComPrefixo: string,
+  cursoId: string
+): Promise<string | null | "sem-acesso"> {
+  try {
+    const controlador = new AbortController();
+    const cronometro = setTimeout(() => controlador.abort(), TIMEOUT_CURSO_MS);
+    const r = await fetch(`${URL_CURSO}/${cursoId}`, {
+      headers: {
+        "x-vertical": X_VERTICAL,
+        Cookie: sidComPrefixo,
+        Accept: "application/json",
+        "User-Agent": USER_AGENT,
+      },
+      cache: "no-store",
+      signal: controlador.signal,
+    });
+    clearTimeout(cronometro);
+    if (r.status === 401 || r.status === 403) return "sem-acesso";
+    if (!r.ok) return null;
+    const corpo = (await r.json()) as { data?: { name?: string } | null };
+    return corpo?.data?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Linha de cookie_status (publicada pelo worker; RLS SELECT authenticated).
 export interface StatusCookie {
   email: string | null;
