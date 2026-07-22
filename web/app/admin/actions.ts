@@ -89,7 +89,10 @@ export async function atualizarCookie(formData: FormData) {
   const { error } = await admin.from("config_ldi").upsert(
     {
       id: 1,
-      cookie,
+      // salva sempre o PAR completo — é o formato que o worker usa no header
+      // Cookie e que o cookie_status.py decodifica (incidente 22/07: o valor
+      // puro salvo aqui quebrava o decode e o probe do worker)
+      cookie: `__Secure-SID=${cookie}`,
       atualizado_em: new Date().toISOString(),
       atualizado_por: user.email,
     },

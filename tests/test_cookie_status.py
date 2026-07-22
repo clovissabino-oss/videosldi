@@ -25,6 +25,16 @@ class TestCookieStatus(unittest.TestCase):
         r = cookie_status.resumo_validade(_sid("a@b.com", int(time.time()) - 10))
         self.assertFalse(r["valido"])
 
+    def test_decodifica_jwt_sem_prefixo(self):
+        """O /admin da web salvava só o VALOR do cookie (sem __Secure-SID=) —
+        o decode precisa aceitar o token puro (incidente 22/07: dias_restantes
+        null e probe recusado com cookie bom)."""
+        bruto = _sid("a@b.com", 9999999999).split("__Secure-SID=")[1].split(";")[0]
+        d = cookie_status.decodifica_sid(bruto)
+        self.assertEqual(d.get("email"), "a@b.com")
+        r = cookie_status.resumo_validade(bruto)
+        self.assertTrue(r["valido"])
+
 
 class _Resp:
     def __init__(self, status):

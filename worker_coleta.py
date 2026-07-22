@@ -73,7 +73,11 @@ def _ler_cookie(rest, key):
                      params={"id": "eq.1", "select": "cookie"}, timeout=30)
     r.raise_for_status()
     linhas = r.json()
-    return (linhas[0]["cookie"] if linhas else None) or None
+    cookie = (linhas[0]["cookie"] if linhas else None) or None
+    # a web pode gravar só o valor do JWT; o header Cookie exige o par completo
+    if cookie and "__Secure-SID=" not in cookie:
+        cookie = f"__Secure-SID={cookie}"
+    return cookie
 
 
 def _publicar_cookie_status(rest, key, cookie, forcar_invalido=False, probe=None):

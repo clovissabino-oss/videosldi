@@ -30,12 +30,15 @@ def probar_cookie(sessao):
 
 
 def decodifica_sid(cookie_bruto):
-    """Extrai {email, expira_ts} do token __Secure-SID; {} se não achar/decodificar."""
+    """Extrai {email, expira_ts} do token __Secure-SID; {} se não achar/decodificar.
+    Aceita também o token JWT puro (sem o prefixo __Secure-SID=) — é o que a
+    tela da web salvava em config_ldi."""
     m = re.search(r"__Secure-SID=([^;\s]+)", cookie_bruto or "")
-    if not m:
+    token = m.group(1) if m else (cookie_bruto or "").strip()
+    if token.count(".") != 2:  # não parece um JWT
         return {}
     try:
-        payload = m.group(1).split(".")[1]
+        payload = token.split(".")[1]
         payload += "=" * (-len(payload) % 4)
         j = json.loads(base64.urlsafe_b64decode(payload))
         return {"email": j.get("email", ""), "expira_ts": j.get("exp")}

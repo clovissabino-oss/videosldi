@@ -164,6 +164,26 @@ class TestProgressoCallback(unittest.TestCase):
         self.assertEqual(status, "cancelada")
 
 
+class TestLerCookieNormaliza(unittest.TestCase):
+    """config_ldi pode ter só o valor do JWT (grava da web) — o worker precisa
+    do par __Secure-SID=<valor> para o header Cookie funcionar no LDI."""
+
+    @patch("worker_coleta.requests.get")
+    def test_valor_puro_ganha_prefixo(self, mock_get):
+        mock_get.return_value = MagicMock(
+            json=lambda: [{"cookie": "eyJx.eyJy.zzz"}], raise_for_status=lambda: None)
+        self.assertEqual(worker_coleta._ler_cookie("http://mock", "k"),
+                         "__Secure-SID=eyJx.eyJy.zzz")
+
+    @patch("worker_coleta.requests.get")
+    def test_com_prefixo_fica_como_esta(self, mock_get):
+        mock_get.return_value = MagicMock(
+            json=lambda: [{"cookie": "__Secure-SID=eyJx.eyJy.zzz"}],
+            raise_for_status=lambda: None)
+        self.assertEqual(worker_coleta._ler_cookie("http://mock", "k"),
+                         "__Secure-SID=eyJx.eyJy.zzz")
+
+
 class TestProbeDeCookie(unittest.TestCase):
     """O exp do JWT mente quando o servidor derruba a sessão (incidente 21/07):
     o worker mantém o veredito do probe HTTP entre ciclos e publica o status
