@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS aulas(
   qtd_videos INTEGER DEFAULT 0, qtd_questoes INTEGER DEFAULT 0,
   qtd_textos INTEGER DEFAULT 0, qtd_pdfs INTEGER DEFAULT 0,
   qtd_casts INTEGER DEFAULT 0, qtd_outros INTEGER DEFAULT 0,
+  vinculado_mb INTEGER,
   PRIMARY KEY(extracao_id, curso_id, capitulo_id, item_id));
 CREATE TABLE IF NOT EXISTS aulas_coletadas(
   extracao_id INTEGER NOT NULL, item_id TEXT NOT NULL,
@@ -81,7 +82,8 @@ def abrir(caminho):
     # migração de bases anteriores à v1.1 (idempotente)
     for sql in ("ALTER TABLE blocos ADD COLUMN banca TEXT",
                 "ALTER TABLE blocos ADD COLUMN ano INTEGER",
-                "ALTER TABLE blocos ADD COLUMN qtd_questoes_texto INTEGER"):
+                "ALTER TABLE blocos ADD COLUMN qtd_questoes_texto INTEGER",
+                "ALTER TABLE aulas ADD COLUMN vinculado_mb INTEGER"):
         try:
             con.execute(sql)
         except sqlite3.OperationalError as e:
@@ -118,7 +120,10 @@ def gravar_arvore(con, extracao_id, cursos):
                 for item in (cap.get("items") or []):
                     q = parse_blocos.contagens_da_aula(item)
                     con.execute(
-                        "INSERT OR REPLACE INTO aulas VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT OR REPLACE INTO aulas(extracao_id, curso_id, capitulo_id, "
+                        "item_id, nome, path, atualizada_em, qtd_videos, qtd_questoes, "
+                        "qtd_textos, qtd_pdfs, qtd_casts, qtd_outros) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (extracao_id, c.get("id", ""), cap.get("chapter_id", ""),
                          item.get("item_id", ""),
                          item.get("name") or item.get("title") or "",
@@ -127,6 +132,20 @@ def gravar_arvore(con, extracao_id, cursos):
                          q["qtd_pdfs"], q["qtd_casts"], q["qtd_outros"]))
                     itens.add(item.get("item_id", ""))
     return len(cursos), len(itens)
+
+
+def gravar_vinculo_mb(con, extracao_id, vinculo):
+    """Grava vinculado_mb (1/0) por item na tabela aulas. `vinculo` = {item_id: bool}.
+    Itens ausentes do dict permanecem NULL (desconhecido). Devolve o nº de linhas
+    de aulas casadas (para o chamador detectar itens que não bateram com a árvore)."""
+    casadas = 0
+    with con:
+        for item_id, tem in vinculo.items():
+            cur = con.execute(
+                "UPDATE aulas SET vinculado_mb=? WHERE extracao_id=? AND item_id=?",
+                (1 if tem else 0, extracao_id, item_id))
+            casadas += cur.rowcount
+    return casadas
 
 
 def aulas_pendentes(con, extracao_id):

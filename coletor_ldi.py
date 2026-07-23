@@ -114,6 +114,40 @@ def _completar_autores(sessao, con, extracao_id, cursos, concorrencia):
         print(f"      ({falhas} cursos sem professor identificado)")
 
 
+def _completar_vinculo_mb(sessao, con, extracao_id, cursos, concorrencia):
+    """Vínculo com o Material Base por item (has_base_material) — vem só de
+    GET /bo/ldi/chapters/{id}/items (o flag de capítulo subnotifica)."""
+    caps = [cap.get("chapter_id") for c in cursos
+            for cap in (c.get("content_tree_cache") or []) if cap.get("chapter_id")]
+
+    def itens_do_cap(ch):
+        r = sessao.get(f"{extrator_ldi.API}/bo/ldi/chapters/{ch}/items", timeout=60)
+        if r.status_code in (401, 403):
+            raise CookieVencido(1)
+        if not r.ok:
+            raise RuntimeError(f"HTTP {r.status_code}")
+        return parse_blocos.vinculo_mb_dos_itens(r.json().get("data") or [])
+
+    falhas = recebidos = casadas = 0
+    with ThreadPoolExecutor(max_workers=int(concorrencia)) as pool:
+        futuros = {pool.submit(itens_do_cap, ch): ch for ch in caps}
+        for fut in as_completed(futuros):
+            try:
+                vinc = fut.result()
+                if vinc:
+                    recebidos += len(vinc)
+                    casadas += banco_conteudo.gravar_vinculo_mb(con, extracao_id, vinc)
+            except CookieVencido:
+                raise
+            except Exception:  # enriquecimento: capítulo pontual falho não derruba
+                falhas += 1
+    if falhas:
+        print(f"      ({falhas} capítulos sem vínculo de MB lido)")
+    if recebidos and not casadas:
+        print("      ⚠ vínculo de MB: recebi itens da API mas nenhum casou com a árvore "
+              "(possível mudança de formato do endpoint) — vinculado_mb ficou vazio.")
+
+
 def _baixar_lote(sessao, con, extracao_id, pendentes, concorrencia,
                  videos_por_item=None, progresso=None):
     """Baixa e grava as aulas pendentes; devolve {item_id: erro} das que falharam.
@@ -205,6 +239,8 @@ def coletar(cfg, sessao, termo, caminho_banco, continuar=False, com_videos=False
             print(f"      {n_cursos} cursos, {n_aulas} aulas únicas (snapshot #{extracao_id})")
             print("      buscando professores (detalhe de cada curso)...")
             _completar_autores(sessao, con, extracao_id, cursos, cfg["concorrencia"])
+            print("      lendo vínculo com o Material Base (por item)...")
+            _completar_vinculo_mb(sessao, con, extracao_id, cursos, cfg["concorrencia"])
             if com_videos:
                 for curso in cursos:
                     for cap in (curso.get("content_tree_cache") or []):

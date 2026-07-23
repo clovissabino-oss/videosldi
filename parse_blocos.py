@@ -70,6 +70,22 @@ def contagens_da_aula(item):
     return c
 
 
+def vinculo_mb_dos_itens(data_itens):
+    """De GET /bo/ldi/chapters/{id}/items: {item_id: has_base_material(bool)}.
+    A API devolve data como dict {"items": [...]}; aceita também a lista direta.
+    O item usa 'id' (fallback 'item_id') como identificador; sem id, ignora."""
+    if isinstance(data_itens, dict):
+        data_itens = data_itens.get("items") or []
+    out = {}
+    for it in (data_itens or []):
+        if not isinstance(it, dict):
+            continue
+        iid = it.get("id") or it.get("item_id")
+        if iid:
+            out[iid] = bool(it.get("has_base_material"))
+    return out
+
+
 def autores_do_curso(curso):
     if curso.get("authors_name"):
         return str(curso["authors_name"])
