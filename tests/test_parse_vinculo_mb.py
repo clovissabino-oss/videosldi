@@ -22,6 +22,21 @@ class TestVinculoMbDosItens(unittest.TestCase):
     def test_lista_vazia(self):
         self.assertEqual(parse_blocos.vinculo_mb_dos_itens([]), {})
 
+    def test_aceita_dict_com_items(self):
+        data = {"items": [
+            {"id": "i1", "has_base_material": True},
+            {"id": "i2", "has_base_material": False},
+        ]}
+        self.assertEqual(parse_blocos.vinculo_mb_dos_itens(data),
+                         {"i1": True, "i2": False})
+
+    def test_ignora_item_nao_dict(self):
+        # iterar um dict cru daria as chaves (strings) — não pode lançar
+        self.assertEqual(parse_blocos.vinculo_mb_dos_itens(["x", None, 3]), {})
+
+    def test_dict_sem_items(self):
+        self.assertEqual(parse_blocos.vinculo_mb_dos_itens({}), {})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -273,7 +273,7 @@
     D.capitulos.forEach(c => {
       const totQ = c.q_emb + c.q_txt;
       const alvo = banca ? (c.bancas[banca] || 0) : "";
-      linhas.push([c.nome, c.aulas, `${c.itens_mb}/${c.itens_total}`, totQ, c.q_emb, c.q_txt,
+      linhas.push([c.nome, c.aulas, c.itens_total ? `${c.itens_mb}/${c.itens_total}` : "—", totQ, c.q_emb, c.q_txt,
         alvo, banca ? totQ - alvo : "", banca ? pc(alvo, totQ) : "",
         pc(c.q_ate, c.q_com_ano), pc(c.q_meio, c.q_com_ano), pc(c.q_novo, c.q_com_ano), c.q_com_ano,
         c.sol_texto, c.sol_video, c.vids, dur(c.dur), c.v_com_data,

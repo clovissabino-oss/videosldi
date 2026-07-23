@@ -128,20 +128,24 @@ def _completar_vinculo_mb(sessao, con, extracao_id, cursos, concorrencia):
             raise RuntimeError(f"HTTP {r.status_code}")
         return parse_blocos.vinculo_mb_dos_itens(r.json().get("data") or [])
 
-    falhas = 0
+    falhas = recebidos = casadas = 0
     with ThreadPoolExecutor(max_workers=int(concorrencia)) as pool:
         futuros = {pool.submit(itens_do_cap, ch): ch for ch in caps}
         for fut in as_completed(futuros):
             try:
                 vinc = fut.result()
                 if vinc:
-                    banco_conteudo.gravar_vinculo_mb(con, extracao_id, vinc)
+                    recebidos += len(vinc)
+                    casadas += banco_conteudo.gravar_vinculo_mb(con, extracao_id, vinc)
             except CookieVencido:
                 raise
             except Exception:  # enriquecimento: capítulo pontual falho não derruba
                 falhas += 1
     if falhas:
         print(f"      ({falhas} capítulos sem vínculo de MB lido)")
+    if recebidos and not casadas:
+        print("      ⚠ vínculo de MB: recebi itens da API mas nenhum casou com a árvore "
+              "(possível mudança de formato do endpoint) — vinculado_mb ficou vazio.")
 
 
 def _baixar_lote(sessao, con, extracao_id, pendentes, concorrencia,

@@ -54,6 +54,18 @@ class TestCompletarVinculoMB(unittest.TestCase):
         with self.assertRaises(coletor_ldi.CookieVencido):
             coletor_ldi._completar_vinculo_mb(sess, self.con, 1, self.cursos, 2)
 
+    def test_grava_vinculo_com_shape_real_da_api(self):
+        # a API real devolve data como DICT {"items": [...]}, não uma lista direto
+        sess = _Sessao({
+            "capA": {"items": [{"id": "i1", "has_base_material": True},
+                                {"id": "i2", "has_base_material": False}]},
+            "capB": {"items": [{"id": "i3", "has_base_material": True}]},
+        })
+        coletor_ldi._completar_vinculo_mb(sess, self.con, 1, self.cursos, 2)
+        got = {r[0]: r[1] for r in self.con.execute(
+            "SELECT item_id, vinculado_mb FROM aulas WHERE extracao_id=1")}
+        self.assertEqual((got["i1"], got["i2"], got["i3"]), (1, 0, 1))
+
 
 if __name__ == "__main__":
     unittest.main()
