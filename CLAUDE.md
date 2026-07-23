@@ -77,6 +77,11 @@ qualidade materializa `pendencias` (catálogo declarativo, chave determinística
 automática no snapshot seguinte). O `painel.py` (porta 8766, `painel.html`/`avaliacao.html`
 embutidas no exe) serve o inventário e a planilha de Avaliação por disciplina (a idade real
 de gravação vem do cache `metabase_depara.json.gz`). Specs/planos em `docs\superpowers\`.
+O coletor também lê o **vínculo com o Material Base** por item (passo `_completar_vinculo_mb`
+via `GET /bo/ldi/chapters/{id}/items` — o `has_base_material` de item, não o de capítulo que
+subnotifica) e grava `aulas.vinculado_mb` (1/0/NULL). O painel expõe: KPI "itens no Material
+Base", achado "N aulas com itens fora do MB" e coluna por aula na Avaliação (o denominador só
+conta itens com vínculo conhecido — NULL = "—").
 
 3. **`visualizador.py` + `ui.html`** — servidor Flask (porta 8765) que serve a `ui.html`
    (single-file, ~100 KB, todo o front em JS vanilla inline) e expõe a API local:

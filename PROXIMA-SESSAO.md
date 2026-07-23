@@ -323,6 +323,21 @@ luiz.alvarenga@ e mirela.barreto@ = operador (404 em /coleta era falta de papel 
 @estrategia.com nascem sem role). Suite 76/76; build limpo. **Após o push: atualizar o
 worker no VPS** (`git pull` + `systemctl restart worker-coleta`).
 
+**Vínculo com o Material Base (23/07, feature nova):** o Painel agora mostra quantos
+**itens** de cada curso estão vinculados ao Material Base do professor (o local oficial
+onde ele guarda as aulas). Descoberta-chave: o flag confiável é `has_base_material` **por
+item**, via `GET /bo/ldi/chapters/{id}/items` — o flag de capítulo subnotifica grosseiramente
+(DMAE: 1/36 capítulos, mas 319/345 itens). Entregue por subagentes (6 tasks TDD, branch
+`feat/vinculo-material-base`, 90+ testes verdes): coluna `aulas.vinculado_mb`, passo
+`_completar_vinculo_mb` no coletor, KPI "itens no Material Base" + achado "N aulas com itens
+fora do MB" na visão geral, coluna por aula na Avaliação, e o campo já flui pro Supabase/web
+(o `sync` reusa o `painel.py`). **Números de aceite (sondados na API): Amparo 68/75, DMAE
+319/345.** Denominador só conta item com vínculo conhecido (NULL = "—", snapshots antigos).
+**Falta o aceite real do Clovis** (roda no seu `conteudo.db` e publica na web): 
+`py coletor_ldi.py --ids "e93d81a4-9b73-4474-b885-136a3e2aef0a" --rotulo "TESTE Amparo MB"`
+e o DMAE `d8970f8c-732d-4bc6-8bf3-bf9d53a9f314` — conferir 68/75 e 319/345 no painel. Depois
+do merge, atualizar o worker no VPS (`git pull` + restart) para o passo valer nas coletas de lá.
+
 **⚠ Pendências da sessão 9 (aceite manual do Clovis):**
 1. Push da branch + PR → `main` (login interativo do Clovis; merge deploya no Vercel).
 2. Aceite do spec: operador dispara → worker (VPS) processa → concurso no seletor;
